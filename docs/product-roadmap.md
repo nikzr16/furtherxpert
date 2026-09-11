@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** the build order for SambungBelajarmu.ai v2, in 7 phases.
 > - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** Phase 1 (foundation) is shipped. Phase 2 (accounts) is next.
+> - **Now:** Phase 1 (foundation) and Phase 2 (accounts, backend only) are shipped. Phase 3 (reference data) is next.
 > - **Where the details live:** `docs/prd/sambungbelajarmu-v2-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
@@ -44,7 +44,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T8) | `docker-compose.yml`, `backend/`, `client/` | shipped | `docker compose up` not yet run live, because the Docker engine was off |
+| `docs/prd/sambungbelajarmu-v2-prd.md` (T8) | `docker-compose.yml`, `backend/`, `client/` | shipped | Confirmed live 2026-09-12: all 3 services start, `/health` reports `db: ok`, client loads |
 
 ### Phase 2: Accounts
 
@@ -53,7 +53,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T3, T4) | `backend/app/api/`, `backend/app/services/` | draft | Features: sign up / log in, delete account |
+| `docs/prd/sambungbelajarmu-v2-prd.md` (T3, T4) | `backend/app/api/`, `backend/app/services/` | shipped | Backend only. Sign up, log in, refresh, log out, view/delete account. No screens yet (client pages come in Phase 6) |
 
 ### Phase 3: Reference data
 
@@ -104,11 +104,11 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | Concern | Introduced In | Matured In | Current State |
 |---|---|---|---|
-| Docker setup | Phase 1 | Phase 3 | Config file valid; not yet run live |
-| Login and access control (JWT) | Phase 2 | Phase 4 | Not started |
+| Docker setup | Phase 1 | Phase 3 | Running live: db + backend + client |
+| Login and access control (JWT) | Phase 2 | Phase 4 | Backend done: sign up, log in, refresh, log out, view/delete account, all guarded by JWT (JSON Web Token, a signed login pass). No client screens yet |
 | Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4 |
-| Database migrations (Alembic) | Phase 1 | Phase 3 | Set up, no tables yet |
-| Automated tests | Phase 1 | Phase 5 | Health check tests pass |
+| Database migrations (Alembic) | Phase 1 | Phase 3 | 1 migration: the `users` table |
+| Automated tests | Phase 1 | Phase 5 | 14 tests pass (health + accounts), on a separate test database |
 
 ## PRD Registry
 
