@@ -1,0 +1,58 @@
+[
+  {
+    "id": "I001",
+    "name": "Politeknik Johor Bahru",
+    "geo": {"lat": 1.476, "lon": 103.763},
+    "region": "Johor",
+    "type": "Public"
+  },
+  {
+    "id": "I002",
+    "name": "Open Learning Malaysia",
+    "geo": {"lat": 3.139, "lon": 101.6869},
+    "region": "KL",
+    "type": "Private"
+  },
+  {
+    "id": "I003",
+    "name": "Kolej Komuniti Selangor",
+    "geo": {"lat": 3.0738, "lon": 101.5183},
+    "region": "Selangor",
+    "type": "Public"
+  },
+  {
+    "id": "I004",
+    "name": "Universiti Pulau Pinang",
+    "geo": {"lat": 5.4141, "lon": 100.3288},
+    "region": "Penang",
+    "type": "Public"
+  },
+  {
+    "id": "I005",
+    "name": "Kolej Komuniti Perak",
+    "geo": {"lat": 4.5975, "lon": 101.0901},
+    "region": "Perak",
+    "type": "Public"
+  },
+  {
+    "id": "I006",
+    "name": "Sabah Technical Institute",
+    "geo": {"lat": 5.9804, "lon": 116.0735},
+    "region": "Sabah",
+    "type": "Private"
+  },
+  {
+    "id": "I007",
+    "name": "Sarawak Polytechnic",
+    "geo": {"lat": 1.5533, "lon": 110.3593},
+    "region": "Sarawak",
+    "type": "Public"
+  },
+  {
+    "id": "I008",
+    "name": "Melaka Business College",
+    "geo": {"lat": 2.1896, "lon": 102.2501},
+    "region": "Melaka",
+    "type": "Private"
+  }
+]

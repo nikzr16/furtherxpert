@@ -1,0 +1,9 @@
+[
+  {
+    "id": "L001",
+    "name": "PTPTN Loan",
+    "eligibility": {"nationality": "Malaysian", "min_gpa": 2.0},
+    "max_amount_rm": 20000,
+    "repayment": "After graduation"
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "id": "S001",
+    "name": "MARA Education Sponsorship",
+    "eligibility": {"race": "Bumiputera", "min_gpa": 3.0},
+    "amount_rm": 25000,
+    "bond": "3 years public service"
+  }
+]

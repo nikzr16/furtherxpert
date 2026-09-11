@@ -1,0 +1,70 @@
+# proj-feature.yml: build a SambungBelajarmu.ai v2 feature or roadmap phase.
+# Route: feature / phase / page / endpoint / auth work on backend/ or client/.
+
+name: SambungBelajarmu Feature
+description: Build a PRD v2 feature or roadmap phase in backend/ and/or client/, test it, review it against the domain and privacy rules, then sync the roadmap and reference docs.
+
+match:
+  intent: [feature, phase, build, implement, endpoint, page, api, client, backend, auth, login, register, chart, explore, docker, summary]
+  priority: 50
+
+steps:
+  - id: build
+    agent: executor
+    skill: execute-plan
+    action: >
+      Implement the requested feature or roadmap phase exactly as specified in
+      docs/prd/sambungbelajarmu-v2-prd.md (read only the relevant sections) and CLAUDE.project.md.
+      Before touching scoring, eligibility, reference data, or the interest test, read
+      .claude/skills/proj-sambung-rules/SKILL.md. Before touching auth, /me endpoints,
+      sign-up, logging, or the AI summary, read .claude/skills/proj-auth-security/SKILL.md.
+      Write tests alongside the code. Never edit sambungbelajarai/ or archieve-sambung/.
+      Report the changed paths and the commands you ran.
+    mandatory: true
+
+  - id: test
+    agent: executor
+    requires: [build]
+    action: >
+      Run the checks for what changed: `cd backend && uv run pytest -q` for backend
+      changes, `cd client && npm run build` for client changes, and
+      `docker compose config -q` if docker-compose.yml changed. Do not fix code.
+      Emit VERDICT PASS if every check passed, or FAIL with the failing output summarised.
+    verdict_contract: ["PASS", "FAIL"]
+    max_retries: 2
+    on_complete:
+      PASS: { next: review }
+      FAIL: { next: build }
+
+  - id: review
+    agent: proj.rules-reviewer
+    requires: [test]
+    action: >
+      Review the build step's changed paths against PRD v2 and your preloaded
+      rule skills. Emit APPROVE, REVISE (fixable, send back to build), or BLOCK
+      (needs a product decision).
+    verdict_contract: ["APPROVE", "REVISE", "BLOCK"]
+    max_retries: 2
+    on_complete:
+      APPROVE: { next: docs }
+      REVISE: { next: build }
+      BLOCK: { next: escalate }
+
+  - id: escalate
+    type: manual
+    requires: [review]
+    action: Explain the reviewer's blocking decision to the user in plain words and ask how to proceed.
+
+  - id: docs
+    agent: executor
+    requires: [review]
+    action: >
+      Update docs/product-roadmap.md statuses for the features or phases touched
+      (shipped only if their acceptance criteria pass). Update
+      docs/reference/folder-structure.md if folders, routes, tables, or config
+      changed. Never edit docs/prd/sambungbelajarmu-v2-prd.md; record any divergence in docs/decisions/.
+      Emit CHANGED if docs were updated, NOOP if nothing needed updating.
+    verdict_contract: ["CHANGED", "NOOP"]
+    on_complete:
+      CHANGED: { next: done }
+      NOOP: { next: done }

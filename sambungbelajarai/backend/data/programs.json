@@ -1,0 +1,196 @@
+[
+  {
+    "id": "P001",
+    "name": "Diploma in Computer Science",
+    "institution_id": "I001",
+    "min_requirements": {"Math": "C", "English": "C"},
+    "field": "IT",
+    "duration_years": 2,
+    "mode": "On-campus",
+    "tuition_fee_rm": 12000,
+    "subjects": [
+      "Programming Fundamentals",
+      "Data Structures",
+      "Databases",
+      "Web Development"
+    ],
+    "topics": [
+      "Python",
+      "Algorithms",
+      "SQL",
+      "HTML/CSS",
+      "Basics of Networking"
+    ],
+    "career_paths": [
+      "Software Developer",
+      "Web Developer",
+      "IT Support Technician",
+      "Junior Data Analyst"
+    ],
+    "industries": [
+      "Software",
+      "E-commerce",
+      "Finance",
+      "Government"
+    ],
+    "hiring_companies": [
+      "Petronas",
+      "Maybank",
+      "AirAsia",
+      "CelcomDigi",
+      "Local Startups"
+    ]
+  },
+  {
+    "id": "P002",
+    "name": "Certificate in Information Technology",
+    "institution_id": "I002",
+    "min_requirements": {"Math": "D"},
+    "field": "IT",
+    "duration_years": 1,
+    "mode": "Online",
+    "tuition_fee_rm": 6000,
+    "subjects": [
+      "Computer Basics",
+      "Intro to Programming",
+      "Networking Fundamentals"
+    ],
+    "topics": [
+      "MS Office",
+      "Python Basics",
+      "Troubleshooting",
+      "Cloud Fundamentals"
+    ],
+    "career_paths": [
+      "IT Support",
+      "Helpdesk Technician",
+      "Junior Web Developer"
+    ],
+    "industries": [
+      "IT Services",
+      "Retail",
+      "SMEs"
+    ],
+    "hiring_companies": [
+      "Telekom Malaysia",
+      "Shopee",
+      "Grab",
+      "Local SMEs"
+    ]
+  },
+  {
+    "id": "P003",
+    "name": "Diploma in Business Administration",
+    "institution_id": "I003",
+    "min_requirements": {"English": "C"},
+    "field": "Business",
+    "duration_years": 2,
+    "mode": "On-campus",
+    "tuition_fee_rm": 10000,
+    "subjects": [
+      "Principles of Management",
+      "Marketing",
+      "Accounting",
+      "Business Communication"
+    ],
+    "topics": [
+      "Excel for Business",
+      "Market Research",
+      "Entrepreneurship Basics",
+      "Presentation Skills"
+    ],
+    "career_paths": [
+      "Business Analyst",
+      "Marketing Executive",
+      "Sales Coordinator",
+      "Administrative Officer"
+    ],
+    "industries": [
+      "Banking",
+      "Retail",
+      "Logistics",
+      "SMEs"
+    ],
+    "hiring_companies": [
+      "CIMB",
+      "AEON",
+      "Pos Malaysia",
+      "Local SMEs"
+    ]
+  },
+  {
+    "id": "P004",
+    "name": "Diploma in Multimedia Design",
+    "institution_id": "I004",
+    "min_requirements": {"English": "C"},
+    "field": "Design",
+    "duration_years": 2,
+    "mode": "On-campus",
+    "tuition_fee_rm": 11000,
+    "subjects": ["Design Principles", "Graphic Design", "UI/UX Basics", "Motion Graphics"],
+    "topics": ["Color theory", "Typography", "Figma", "Adobe Suite", "Prototyping"],
+    "career_paths": ["Graphic Designer", "UI Designer", "Motion Designer"],
+    "industries": ["Advertising", "Media", "Tech"],
+    "hiring_companies": ["Agencies", "Media Houses", "Startups"]
+  },
+  {
+    "id": "P005",
+    "name": "Certificate in Office Administration",
+    "institution_id": "I005",
+    "min_requirements": {"English": "D"},
+    "field": "Business",
+    "duration_years": 1,
+    "mode": "On-campus",
+    "tuition_fee_rm": 5000,
+    "subjects": ["Business Communication", "Office Applications", "Basic Accounting"],
+    "topics": ["MS Office", "Scheduling", "Filing", "Invoices", "Customer service"],
+    "career_paths": ["Admin Assistant", "Clerk", "Receptionist"],
+    "industries": ["SMEs", "Education", "Retail"],
+    "hiring_companies": ["Local SMEs", "Schools", "Retail Chains"]
+  },
+  {
+    "id": "P006",
+    "name": "Diploma in Network Engineering",
+    "institution_id": "I006",
+    "min_requirements": {"Math": "C"},
+    "field": "IT",
+    "duration_years": 2,
+    "mode": "On-campus",
+    "tuition_fee_rm": 11500,
+    "subjects": ["Networking Fundamentals", "Routing & Switching", "Network Security"],
+    "topics": ["TCP/IP", "VLANs", "Routing protocols", "Firewalls", "Wi‑Fi"],
+    "career_paths": ["Network Technician", "NOC Engineer", "IT Support"],
+    "industries": ["Telecom", "IT Services", "Finance"],
+    "hiring_companies": ["Telekom Malaysia", "ISPs", "Banks"]
+  },
+  {
+    "id": "P007",
+    "name": "Diploma in Hospitality Management",
+    "institution_id": "I007",
+    "min_requirements": {"English": "C"},
+    "field": "Hospitality",
+    "duration_years": 2,
+    "mode": "On-campus",
+    "tuition_fee_rm": 9000,
+    "subjects": ["Front Office Operations", "Food & Beverage", "Customer Service"],
+    "topics": ["Reservations", "Banquet service", "Service recovery", "Events"],
+    "career_paths": ["Guest Service Agent", "F&B Supervisor", "Event Coordinator"],
+    "industries": ["Hotels", "Tourism", "Events"],
+    "hiring_companies": ["Hotel Chains", "Resorts", "Event Firms"]
+  },
+  {
+    "id": "P008",
+    "name": "Diploma in Culinary Arts",
+    "institution_id": "I008",
+    "min_requirements": {"English": "C"},
+    "field": "Hospitality",
+    "duration_years": 2,
+    "mode": "On-campus",
+    "tuition_fee_rm": 9500,
+    "subjects": ["Kitchen Fundamentals", "Food Safety", "Pastry Basics"],
+    "topics": ["Knife skills", "Menus", "HACCP", "Baking"],
+    "career_paths": ["Commis Chef", "Pastry Cook", "Kitchen Assistant"],
+    "industries": ["F&B", "Hotels", "Catering"],
+    "hiring_companies": ["Restaurants", "Hotels", "Caterers"]
+  }
+]

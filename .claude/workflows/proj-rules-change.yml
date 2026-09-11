@@ -1,0 +1,53 @@
+# proj-rules-change.yml: change scoring, UPU eligibility, the interest test, or reference data.
+# Higher priority than proj-feature so rule/data wording routes here.
+
+name: SambungBelajarmu Rules Change
+description: Change scoring formulas, UPU eligibility logic, interest-test questions/tags, area mappings, or the UPU reference data (import + Alembic data migration), guarded by the golden sample-student tests.
+
+match:
+  intent: [scoring, score, formula, eligibility, upu, syarat, rule, rules, interest, question, mapping, nec, import, snapshot, epanduan, migration, data, golden]
+  priority: 70
+
+steps:
+  - id: change
+    agent: executor
+    skill: proj-sambung-rules
+    action: >
+      Make the requested rule or data change following the proj-sambung-rules skill
+      and docs/prd/sambungbelajarmu-v2-prd.md T1, T2, T5. Reference data changes go through the e-Panduan
+      snapshot + a new Alembic data migration, never hand-edited rows. If the change
+      is intended to alter golden outputs, update backend/tests/golden/expected/ and
+      state exactly which rule changed and why. Report changed paths.
+    mandatory: true
+
+  - id: golden
+    agent: executor
+    requires: [change]
+    action: >
+      Run `cd backend && uv run pytest -q` (golden, scoring, and eligibility tests
+      included). Do not fix code. Emit PASS if all pass, or FAIL with the
+      differing students/values summarised.
+    verdict_contract: ["PASS", "FAIL"]
+    max_retries: 2
+    on_complete:
+      PASS: { next: review }
+      FAIL: { next: change }
+
+  - id: review
+    agent: proj.rules-reviewer
+    requires: [golden]
+    action: >
+      Review the change against the proj-sambung-rules checklist. Pay special
+      attention to counts-once, category A/B selection, hard stops, and any
+      golden expected-value edits (each must be justified). Emit APPROVE, REVISE, or BLOCK.
+    verdict_contract: ["APPROVE", "REVISE", "BLOCK"]
+    max_retries: 2
+    on_complete:
+      APPROVE: { next: done }
+      REVISE: { next: change }
+      BLOCK: { next: escalate }
+
+  - id: escalate
+    type: manual
+    requires: [review]
+    action: Explain the reviewer's blocking decision to the user in plain words and ask how to proceed.
