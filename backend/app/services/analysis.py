@@ -153,7 +153,7 @@ def get_analysis(db: DbSession, user: User) -> dict:
     love_scores = interest_area_scores(picks_by_area, max_picks_by_area)
     excel_scores_ = excel_scores(group_scores, area_subject_groups)
     excel_top3 = top_three(excel_scores_, tiebreak_scores=love_scores)
-    love_top3 = top_three(love_scores, tiebreak_scores=excel_scores_)
+    love_top3 = top_three(love_scores, tiebreak_scores=excel_scores_, exclude_zero=True)
     sweet = sweet_spots(excel_top3, love_top3)
 
     # --- k. Best Fit: union of excel-top3 and love-top3 areas (judgment call -- see report)

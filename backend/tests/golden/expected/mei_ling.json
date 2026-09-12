@@ -1,5 +1,5 @@
 {
-  "_derivation": "Same results and interest answers as Amir, with only race changed (Melayu -> Cina). Race must never affect the scoring/chart pure functions (app/services/scoring.py), so every chart field below is byte-for-byte identical to expected/amir.json. See amir.json's _derivation for the corrected HUMANITIES/LANGUAGES values (the same correction applies here for the same reason). The test asserts both against this static file AND directly against Amir's live response body, so any accidental race-based divergence in either direction is caught.",
+  "_derivation": "Same results and interest answers as Amir, with only race changed (Melayu -> Cina). Race must never affect the scoring/chart pure functions (app/services/scoring.py), so every chart field below is byte-for-byte identical to expected/amir.json. See amir.json's _derivation for the corrected HUMANITIES/LANGUAGES values (the same correction applies here for the same reason). The test asserts both against this static file AND directly against Amir's live response body, so any accidental race-based divergence in either direction is caught. RULE CHANGE (decision 0007): 'Likely to love' now excludes any area scoring 0 interest before taking the top 3, so it can return 0-3 areas. Identical to Amir's change for the identical reason (same interest picks, race-independent scoring): likely_to_love = [Science & Technology 100.0] only (Media & Communications and Agriculture & Environment dropped as 0-score filler), sweet_spots = [Science & Technology] only (the other two drop out of the intersection since they're no longer in love, even though they're still in likely_to_excel). Still byte-for-byte identical to amir.json.",
   "subject_groups": {
     "COMMERCE": 33.3,
     "HUMANITIES": 88.9,
@@ -25,10 +25,8 @@
     ["Agriculture & Environment", 92.6]
   ],
   "likely_to_love": [
-    ["Science & Technology", 100.0],
-    ["Media & Communications", 0.0],
-    ["Agriculture & Environment", 0.0]
+    ["Science & Technology", 100.0]
   ],
-  "sweet_spots": ["Science & Technology", "Media & Communications", "Agriculture & Environment"],
+  "sweet_spots": ["Science & Technology"],
   "category": "A"
 }

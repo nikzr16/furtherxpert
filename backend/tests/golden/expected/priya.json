@@ -1,5 +1,5 @@
 {
-  "_derivation": "Grade -> points -> percent as in amir.json. ARTS = mean(PSV A=88.889%, BU A-=77.778%, RBG B+=66.667%) = 233.333/3 = 77.778 -> 77.8. HUMANITIES = SJ C alone = 33.333 -> 33.3. LANGUAGES = mean(BM B=55.556%, BI B=55.556%) = 55.6. Arts & Design excel = ARTS alone = 77.8. Media & Communications excel = mean(LANGUAGES=55.6, ARTS=77.8) = 66.7. Hospitality & Tourism excel = LANGUAGES alone (Priya has no COMMERCE subjects) = 55.6. love: Arts & Design picks=4/9=44.4, Media & Communications picks=2/9=22.2, all other areas 0. All numbers here match the orchestrator's hand-derived draft exactly -- no discrepancy found for Priya.",
+  "_derivation": "Grade -> points -> percent as in amir.json. ARTS = mean(PSV A=88.889%, BU A-=77.778%, RBG B+=66.667%) = 233.333/3 = 77.778 -> 77.8. HUMANITIES = SJ C alone = 33.333 -> 33.3. LANGUAGES = mean(BM B=55.556%, BI B=55.556%) = 55.6. Arts & Design excel = ARTS alone = 77.8. Media & Communications excel = mean(LANGUAGES=55.6, ARTS=77.8) = 66.7. Hospitality & Tourism excel = LANGUAGES alone (Priya has no COMMERCE subjects) = 55.6. love: Arts & Design picks=4/9=44.4, Media & Communications picks=2/9=22.2, all other areas 0. All numbers here match the orchestrator's hand-derived draft exactly -- no discrepancy found for Priya. RULE CHANGE (decision 0007): 'Likely to love' now excludes any area scoring 0 interest before taking the top 3, so it can return 0-3 areas. Priya's old love list was [Arts & Design 44.4, Media & Communications 22.2, Hospitality & Tourism 0.0] -- the last entry is 0-score filler. Under the new rule it is dropped, leaving likely_to_love = [Arts & Design 44.4, Media & Communications 22.2] (2 items). Hospitality & Tourism is unaffected in likely_to_excel (excel never filters by zero, still #3 there at 55.6), but it drops out of sweet_spots because it's no longer in the (now-filtered) love list: sweet_spots = [Arts & Design, Media & Communications] only.",
   "subject_groups": {
     "ARTS": 77.8,
     "HUMANITIES": 33.3,
@@ -23,9 +23,8 @@
   ],
   "likely_to_love": [
     ["Arts & Design", 44.4],
-    ["Media & Communications", 22.2],
-    ["Hospitality & Tourism", 0.0]
+    ["Media & Communications", 22.2]
   ],
-  "sweet_spots": ["Arts & Design", "Media & Communications", "Hospitality & Tourism"],
+  "sweet_spots": ["Arts & Design", "Media & Communications"],
   "category": "B"
 }

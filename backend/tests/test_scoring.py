@@ -142,7 +142,60 @@ def test_top_three_does_not_mutate_inputs():
     assert tiebreak == {"A": 1.0}
 
 
+def test_top_three_exclude_zero_false_by_default_keeps_zero_entries():
+    # Default behaviour (used by "Likely to excel") must be unaffected: a
+    # 0-score entry still competes for a top-3 slot like any other score.
+    scores = {"A_AREA": 50.0, "B_AREA": 0.0}
+    result = top_three(scores)
+    assert result == [("A_AREA", 50.0), ("B_AREA", 0.0)]
+
+
+def test_top_three_exclude_zero_true_drops_zero_entries():
+    # "Likely to love" behaviour: 0-score entries are filtered out before
+    # ranking, so they never occupy a top-3 slot even as filler.
+    scores = {"A_AREA": 50.0, "B_AREA": 0.0, "C_AREA": 0.0}
+    result = top_three(scores, exclude_zero=True)
+    assert result == [("A_AREA", 50.0)]
+
+
+def test_top_three_exclude_zero_can_return_fewer_than_three():
+    scores = {"A_AREA": 0.0, "B_AREA": 0.0, "C_AREA": 0.0}
+    result = top_three(scores, exclude_zero=True)
+    assert result == []
+
+
+def test_top_three_exclude_zero_does_not_mutate_inputs():
+    scores = {"A": 0.0, "B": 2.0}
+    tiebreak = {"A": 1.0}
+    top_three(scores, tiebreak, exclude_zero=True)
+    assert scores == {"A": 0.0, "B": 2.0}
+    assert tiebreak == {"A": 1.0}
+
+
 # --- sweet_spots -----------------------------------------------------------------
+
+
+def test_love_top3_and_sweet_spots_exclude_zero_score_area_even_if_tied_for_excel():
+    # AREA_Z is in the excel top-3 and, under the OLD rule (no exclude_zero),
+    # its 0.0 love score would still have made the love top-3 as tiebreak
+    # filler -- making it a sweet spot even though the student has zero
+    # interest in it. The new rule (exclude_zero=True on the love call)
+    # must drop it from love, and therefore from sweet_spots too, even
+    # though it's still #3 in likely_to_excel.
+    excel_scores = {"AREA_X": 90.0, "AREA_Y": 80.0, "AREA_Z": 70.0}
+    love_scores = {"AREA_X": 60.0, "AREA_Y": 0.0, "AREA_Z": 0.0}
+
+    # Sanity check: confirm this really was the old-rule trap.
+    old_love_top3 = top_three(love_scores, tiebreak_scores=excel_scores)
+    assert ("AREA_Z", 0.0) in old_love_top3
+
+    excel_top3 = top_three(excel_scores, tiebreak_scores=love_scores)
+    love_top3 = top_three(love_scores, tiebreak_scores=excel_scores, exclude_zero=True)
+    sweet = sweet_spots(excel_top3, love_top3)
+
+    assert love_top3 == [("AREA_X", 60.0)]
+    assert "AREA_Z" not in sweet
+    assert sweet == ["AREA_X"]
 
 
 def test_sweet_spots_returns_areas_in_both_lists():

@@ -96,6 +96,7 @@ def excel_scores(group_scores: dict[str, float], area_subject_groups: dict[str, 
 def top_three(
     scores: dict[str, float],
     tiebreak_scores: dict[str, float] | None = None,
+    exclude_zero: bool = False,
 ) -> list[tuple[str, float]]:
     """Top 3 (name, score) pairs, descending by score (PRD T1).
 
@@ -105,8 +106,18 @@ def top_three(
     has one (a judgment call: "if given/present" reads as "present beats
     absent" -- see report). Returns fewer than 3 if fewer than 3 entries
     exist. Does not mutate either input.
+
+    `exclude_zero` (default False): when True, entries with `score == 0`
+    are dropped from `scores` before ranking, so the result can hold 0-3
+    entries instead of always up to 3 (PRD T1 "Likely to love": a 0-interest
+    area is not something the student is likely to love, so it is left out
+    rather than padded in as filler). `tiebreak_scores` is never filtered by
+    this flag -- it's only consulted for whichever entries remain. Default
+    False keeps every existing caller (e.g. "Likely to excel") unaffected.
     """
     tiebreak_scores = tiebreak_scores or {}
+    if exclude_zero:
+        scores = {name: score for name, score in scores.items() if score != 0}
 
     def sort_key(item: tuple[str, float]) -> tuple[float, float, str]:
         name, score = item

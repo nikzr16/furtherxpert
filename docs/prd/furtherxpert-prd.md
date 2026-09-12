@@ -49,7 +49,7 @@ Also called: **scope**.
 - **Interest test:** 20 questions with 5 options each. It can be retaken.
 - **Chart 1, subject strengths:** a **spider chart** (a web-shaped chart, also called a radar chart) of subject groups.
 - **Chart 2, interests:** a spider chart of 9 interest areas.
-- **Best Fit:** the top 3 areas the student will **likely excel in**, and the top 3 they'll **likely love**. An area in both lists is a **Sweet spot**. Each area shows up to 3 matching programs.
+- **Best Fit:** the top 3 areas the student will **likely excel in**, and up to 3 they'll **likely love**. An area scoring 0 interest is left out, so the "love" list can be shorter than 3, or empty if the test wasn't taken. An area in both lists is a **Sweet spot**. Each area shows up to 3 matching programs.
 - **Eligibility check:** every program shows **Eligible**, **Conditional** or **Not Eligible**, with reasons.
 - **AI summary:** a short plain-words explanation of the charts, written by GPT-5.
 - **Explore:** browse and filter all UA diploma programs.
@@ -208,7 +208,7 @@ Programs whose NEC code matches no prefix still appear in Explore, but not in Be
 
 **Best Fit**
 - **Likely to excel:** an area's score is the average of its subject groups the student took. Areas with none of those groups are left out. Top 3.
-- **Likely to love:** the area's interest score. Top 3.
+- **Likely to love:** the area's interest score. Top 3, **excluding any area scoring 0**. So this list holds 0 to 3 areas. Empty means the student hasn't taken the test, or picked "None of the above" every time.
 - **Ties:** broken by the other score, then by area name.
 - **Programs per area:** only Eligible or Conditional ones. Eligible first, then by name. Max 3.
 

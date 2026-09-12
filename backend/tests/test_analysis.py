@@ -173,6 +173,61 @@ def test_cache_invalidation_on_answers_change(client, make_register_payload, db_
     assert second["computed_at"] != first["computed_at"]
 
 
+# --- Likely to love excludes 0-score areas (decision 0007) --------------------
+
+
+def test_love_list_holds_one_item_when_only_one_area_has_a_nonzero_score(client, make_register_payload, db_session):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    q1, _q2 = _first_two_questions(client)
+    tagged_option = _non_none_option(q1)
+    area_name = _area_name_for_option(db_session, tagged_option["id"])
+
+    put_resp = client.put(
+        "/me/interest-answers",
+        json=[{"question_id": q1["id"], "option_id": tagged_option["id"]}],
+        headers=_auth(token),
+    )
+    assert put_resp.status_code == 200
+
+    body = client.get("/me/analysis", headers=_auth(token)).json()
+
+    # Only one area has any picks at all (every other area's own Chart 2
+    # score is still 0.0), so the love top-3 list holds exactly that one
+    # area -- it is never padded to 3 with 0-score filler.
+    assert len(body["likely_to_love"]) == 1
+    assert body["likely_to_love"][0]["area"] == area_name
+    assert body["likely_to_love"][0]["score"] > 0.0
+
+
+def test_love_list_is_empty_when_interest_test_never_taken_but_excel_and_charts_unaffected(
+    client, make_register_payload
+):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    _put_results(
+        client,
+        token,
+        [
+            {"subject_code": "BM", "grade": "A+"},
+            {"subject_code": "SJ", "grade": "A+"},
+            {"subject_code": "MT", "grade": "A+"},
+            {"subject_code": "PSV", "grade": "A+"},
+        ],
+    )
+
+    body = client.get("/me/analysis", headers=_auth(token)).json()
+
+    # No interest-test answers were ever saved -- every one of the 9 areas
+    # stays at 0.0 (Chart 2 is never omitted), so the love top-3 is empty.
+    assert len(body["interest_areas"]) == 9
+    assert all(entry["score"] == 0.0 for entry in body["interest_areas"])
+    assert body["likely_to_love"] == []
+
+    # "Likely to excel" and the charts are unaffected by the love-list rule
+    # change -- they're still computed normally from the saved grades.
+    assert body["subject_groups"] != []
+    assert body["likely_to_excel"] != []
+
+
 # --- Non-citizen: Best Fit programs are always empty, charts still shown -----
 
 
@@ -197,7 +252,11 @@ def test_non_citizen_best_fit_has_no_programs_but_charts_still_shown(client, mak
     assert body["subject_groups"] != []
     assert len(body["interest_areas"]) == 9
     assert body["likely_to_excel"] != []
-    assert body["likely_to_love"] != []
+    # This test never saves interest-test answers, so every interest score
+    # is 0.0 and likely_to_love is correctly empty under decision 0007's
+    # 0-score exclusion -- it is likely_to_excel (grade-based, unaffected by
+    # that rule) that proves the charts are still fully computed here.
+    assert body["likely_to_love"] == []
 
     # But a non-citizen can never be Eligible/Conditional for any program
     # (PRD T2 hard stop), so Best Fit's program lists must all be empty --

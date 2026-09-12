@@ -27,7 +27,7 @@ checklist; if it disagrees with the PRD, the PRD wins. Report the mismatch.
 | Subject group score | mean percent of subjects taken in the group; groups with none taken are **omitted** |
 | Interest area score | picks ÷ max possible picks for that area × 100; "None of the above" = 0 picks |
 | Excel score (area) | mean of the area's subject-group scores the student has; omit the area if none |
-| Top lists | top 3 by excel, top 3 by interest; ties → other score desc, then area name asc |
+| Top lists | excel: top 3 by excel score (unchanged). love: top 3 by interest score, **excluding any area scoring 0** — so love holds 0-3 areas, never padded with 0-score filler. Same tie-break (other score desc, then area name asc) for whichever entries remain in each list |
 | Sweet spot | area present in both top-3 lists |
 | Programs per area | Eligible first, then Conditional, then name; max 3; never Not Eligible |
 
