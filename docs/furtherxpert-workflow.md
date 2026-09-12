@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** how the app behaves **today**: what happens, step by step, when a student uses it.
 > - **Why:** when you change code, this doc is the spec for current behaviour. If code and this doc disagree, fix one of them.
-> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back), and analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes). Each new phase adds its flow here.
+> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back, and resuming a part-finished interest test), analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes, and gated on the interest test being fully answered), and the client pages (Phase 6: the 8 screens a student actually sees and clicks through, from registering to deleting their account). Each new phase adds its flow here.
 
 > **Type:** Workflow | **Must stay current:** Yes -- update when behavior changes
 
@@ -20,7 +20,7 @@ Add one "Flow" section per feature as phases ship.
 
 ## Purpose
 
-Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2), **reference data** (Phase 3), **student input** (Phase 4), and **analysis** (Phase 5). Only the backend exists yet. There are no screens until Phase 6, so flows start from API requests -- except the yearly import below, which a developer runs by hand.
+Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2), **reference data** (Phase 3), **student input** (Phase 4), **analysis** (Phase 5), and the **client pages** (Phase 6). Flows 1-4 below start from API requests directly, since that's how a developer or a test checks them. Flow 5 covers the same ground from the student's point of view: what they see and click on the website, and which of Flows 1-4's API calls each screen makes.
 
 ## Trigger
 
@@ -158,11 +158,15 @@ Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school l
 **Actions:**
 1. Check the payload has no repeated question id, and every question id and option id is real.
 2. Check each option actually belongs to the question it's paired with -- a mismatched pair (option from a different question) is rejected.
-3. **Retake = full replace:** delete every one of the student's previous answers, then insert the new payload's rows, in the same database transaction. So a retake can never leave a mix of old and new answers.
-4. A payload doesn't have to cover all 20 questions -- whatever subset is sent becomes the student's whole new answer set. Each interest area's score is worked out from picks made, not from a fixed total (PRD T1), so a partial answer set still scores correctly.
+3. **Merge/upsert (decision `0008`), not a full replace:** each payload item updates the student's existing answer for that question, or inserts a new one. A question the payload leaves out keeps whatever the student answered before -- it's never deleted. This is what lets the client save progress after every single question (Phase 6 "save-as-you-go") without resending everything so far, while a genuine full 20-question retake still behaves like a full replace from the student's point of view (every question is in the payload either way).
+4. A payload doesn't have to cover all 20 questions -- only the questions it mentions are touched. Each interest area's score is worked out from picks made, not from a fixed total (PRD T1), but is only ever computed once **all 20** questions are answered across every save so far (decision `0008`, see Flow 4 step 1g2).
 
-**Output:** `200` with the saved `{question_id, option_id}` pairs.
+**Output:** `200` with the saved `{question_id, option_id}` pairs (only the ones in this payload, not the student's full answer set).
 **On failure:** `400` with a message naming the problem -- a duplicate question id, an unknown question or option id, or an option that doesn't belong to its question.
+
+**Input:** `GET /me/interest-answers` (Phase 6, decision `0008`).
+**Actions:** load every answer the student has saved so far, and compare the count against the total number of questions.
+**Output:** `200` with `{"answers": [{question_id, option_id}, ...], "complete": bool}` -- the student's saved answers (however many so far), and whether all 20 are answered yet. This is what lets the client resume a part-finished test and show progress (e.g. "12 of 20").
 
 ### 4. Deleting your account cleans up both
 
@@ -186,13 +190,14 @@ Analysis turns a student's saved SPM (**Sijil Pelajaran Malaysia**) results and 
    d. Count the student's own picks per area from their saved interest-test answers ("None of the above" answers don't count toward any area).
    e. Load **syarat am** (general_requirements), the entry rules that apply to every program in this session + category.
    f. Load every program in this session + category, with its own **syarat khas** (program_requirements), and run the eligibility check (Flow 4 step 2's rules) for each one against the student's grades, citizenship, and race.
-   g. Compute **Chart 1** (subject-group scores: the mean grade-percent of the subjects the student took in that group; a group with none of its subjects taken is left out entirely, never shown as 0), and **Chart 2** (interest-area scores: picks / max picks, as a percent; every one of the 9 areas is always shown, even at 0%).
-   h. Compute **Likely to excel** (top 3 areas by Chart 1's related subject groups; an area is left out if the student has none of its subject groups) and **Likely to love** (top 3 areas by Chart 2's score, **excluding any area that scores 0 interest** -- see decision `0007`). Ties are broken by the other list's score, then by area name. Because 0-score areas are excluded, Likely to love can return 0 to 3 areas -- fewer than 3, or empty if the student hasn't taken the interest test (or picked "None of the above" every time).
+   g2. **Interest-test completeness gate (decision `0008`):** compare the student's answered-question count against the total number of questions (20). Interest scores are only ever computed once **all 20** are answered -- a part-finished test's picks so far must never leak into the chart, Best Fit, or a sweet spot. Until then, every Chart 2 score is forced to 0.
+   g. Compute **Chart 1** (subject-group scores: the mean grade-percent of the subjects the student took in that group; a group with none of its subjects taken is left out entirely, never shown as 0), and **Chart 2** (interest-area scores: picks / max picks, as a percent, only once the interest test is complete -- otherwise every one of the 9 areas is shown at a forced 0%; the 9 areas are always shown either way, never omitted).
+   h. Compute **Likely to excel** (top 3 areas by Chart 1's related subject groups; an area is left out if the student has none of its subject groups) and **Likely to love** (top 3 areas by Chart 2's score, **excluding any area that scores 0 interest** -- see decision `0007` -- and forced to empty entirely while the interest test is incomplete -- decision `0008`). Ties are broken by the other list's score, then by area name. Because 0-score areas are excluded, Likely to love can return 0 to 3 areas -- fewer than 3, or empty if the student hasn't taken the interest test, hasn't finished it yet, or picked "None of the above" every time.
    i. **Sweet spot:** any area that appears in both top-3 lists. Since Likely to love can no longer contain a 0-score area, a 0-score area can no longer be a Sweet spot either -- a direct consequence of step h's rule, not a separate check.
    j. **Best Fit:** for every area that appears in *either* top-3 list (the union, not excel-only), show up to 3 of that area's programs -- Eligible ones first, then by name, and only Eligible or Conditional programs, never Not Eligible.
    k. Save the whole result as one row in `analysis` (replacing nothing, since there's no existing row at this point), and return it.
 
-**Output:** `200` with subject-group scores, interest-area scores, Likely to excel, Likely to love, Sweet spot, Best Fit, the category (A/B) used, and `computed_at` (when it was worked out).
+**Output:** `200` with subject-group scores, interest-area scores, Likely to excel, Likely to love, Sweet spot, Best Fit, the category (A/B) used, `computed_at` (when it was worked out), and `interest_test_complete` (whether all 20 interest-test questions are answered yet -- decision `0008`).
 **On failure:** if the current session has no `general_requirements` row for the student's category (a data problem, not a student mistake -- see the Error States table below), the request fails with a `500` server error rather than a normal eligibility result.
 
 > **Watch out:** a non-citizen student still gets both full charts (PRD T2: "the charts are still shown") -- only Best Fit's program lists come back empty for them, since a non-citizen can never be Eligible or Conditional for any program (a hard stop, checked first). The same "still show charts" rule applies to a Bumiputera-only program mismatch: it only empties that one program out of Best Fit, not the whole response.
@@ -206,6 +211,76 @@ Analysis turns a student's saved SPM (**Sijil Pelajaran Malaysia**) results and 
 **Cache invalidation:** both `PUT /me/results` (Flow 3) and `PUT /me/interest-answers` (Flow 3) delete the student's cached `analysis` row as part of their own save, every time they succeed -- there's no check for whether the save actually changed anything. So the very next `GET /me/analysis` after either save always recomputes fresh; it can never return numbers from before that save. See decision `0006` for why this is unconditional rather than diffed.
 
 > **Watch out:** deleting a student's account (Flow 1's `DELETE /me`) removes their `analysis` row too, the same `ON DELETE CASCADE` way as `spm_results` and `interest_answers`.
+
+## Flow 5: Client pages
+
+The client is the website a student actually uses (`client/src/`, React + Vite + Tailwind CSS + Recharts, a charting library). It has 8 pages. Every page that needs a login is wrapped in `ProtectedRoute.jsx`, which sends a logged-out visitor to Login instead of showing the page. None of these pages invent new rules -- each one just calls the API routes from Flows 1-4 and shows the result.
+
+### 1. Register
+
+**Page:** `pages/Register.jsx`.
+**What it does:** shows a form for email, password, citizenship, race, SPM year, and a consent tick. It explains in plain words that **race** is only collected to check Bumiputera-only programs (a UPU rule, not the app's choice), before asking for it.
+**Calls:** `POST /auth/register` (Flow 1 step 1).
+**On failure:** shows the field error the backend returns (bad password length, unknown race, missing consent) or "Email already registered" and a link to Login.
+
+### 2. Log in
+
+**Page:** `pages/Login.jsx`.
+**What it does:** shows an email + password form.
+**Calls:** `POST /auth/login` (Flow 1 step 2). On success, saves the returned access token in memory (see step 3) and sends the student to the page they were originally headed to, or to My Results by default.
+**On failure:** shows the same generic "wrong email or password" message the backend returns either way -- the page never guesses which part was wrong.
+
+### 3. Staying logged in
+
+**Piece:** `context/AuthContext.jsx`, used by every other page.
+**What it does:**
+1. Holds the access token only in React state (in-memory), never in `localStorage` or `sessionStorage` -- so it disappears if the tab is closed, matching the token-storage rule already set in the PRD.
+2. On every app load, silently calls `POST /auth/refresh` (Flow 1 step 4) with `credentials: "include"` (so the browser sends the `refresh_token` cookie automatically) to get a fresh access token without the student having to log in again, as long as their refresh cookie is still valid.
+3. If any API call comes back `401 Unauthorized`, tries `POST /auth/refresh` once and repeats the call. If that also fails, sends the student to Login.
+
+### 4. SPM Results page
+
+**Page:** `pages/SpmResults.jsx`.
+**What it does:** shows one row per subject (subject + grade dropdown), with Bahasa Melayu and Sejarah always present since they're required (Flow 3 step 1). Grade choices are limited to the 10 real SPM grades from `constants.js`, but the backend is still the final judge -- the page never assumes its own copy of the rules is complete.
+**Calls:** `GET /me/results` on load, `PUT /me/results` on save (Flow 3 steps 1-2).
+**On failure:** shows the backend's field error (bad grade, duplicate subject, missing BM/SJ, unknown subject code) without saving.
+
+### 5. Interest Test page
+
+**Page:** `pages/InterestTest.jsx`.
+**What it does:** shows the 20 questions one at a time (or as a list, page by page), each with its options.
+1. On load, calls `GET /me/interest-answers` (Flow 3 step 3, decision `0008`) to fetch any answers already saved, and pre-fills them so the student resumes exactly where they left off -- including after closing the tab and coming back later.
+2. Saves each answer immediately after the student picks it, with `PUT /me/interest-answers` sending just that one `{question_id, option_id}` pair. Because that route merges/upserts (decision `0008`) instead of replacing everything, earlier answers are never lost by a later, smaller save.
+3. Shows a live "N of 20 answered" progress count from the same saved-answers data.
+**Resume/completeness rule:** the test only counts as finished once all 20 questions have an answer across every save so far -- there's no separate "submit" step. Until then, `GET /me/analysis` (Flow 4 step 1g2) forces the interest-area chart and Likely to love to empty/0, so the My Results page (step 6 below) shows an unfinished state rather than a misleading partial score.
+
+### 6. My Results page
+
+**Page:** `pages/MyResults.jsx`.
+**What it does:** the main results screen. Shows both radar charts (subject-group scores and interest-area scores) via the shared `components/RadarChartCard.jsx`, the Best Fit program list with sweet-spot / likely-to-excel / likely-to-love badges, and an eligibility badge with reasons for each program, via `components/EligibilityBadge.jsx`.
+**Calls:** `GET /me/analysis` (Flow 4 step 1).
+**Accessibility fallback:** every radar chart also renders a real `<table>` of the same numbers inside a collapsed `<details>` element (not hidden with `display: none`), so a screen reader or a student who can't read the chart visually still gets the same information. This meets **WCAG AA** (Web Content Accessibility Guidelines, level AA -- a common accessibility standard).
+**Incomplete interest test:** while `interest_test_complete` is `false` (decision `0008`), the interest-area chart and Likely to love area show an empty state telling the student to finish the interest test, instead of a chart that looks real but isn't.
+
+### 7. Explore page
+
+**Page:** `pages/Explore.jsx`.
+**What it does:** lets a student browse every diploma program, not just their own Best Fit, with filters by interest area and university plus free-text search.
+**Calls:** `GET /programs` once on load (Flow 2 step 2), with no filter parameters, then filters that one fetched list in the browser (**client-side filtering**) as the student changes the area/university/search fields, instead of re-calling the API on every keystroke. With the current session's program count (166 category-A programs), fetching once and filtering locally keeps the page responsive without extra round trips to the server.
+
+### 8. Program Detail page
+
+**Page:** `pages/ProgramDetail.jsx`.
+**What it does:** shows one program's full detail: everything from the Explore list, plus career paths, the entry-rule tree, the original Malay rule text (`text_ms`), and a source-credit line crediting e-Panduan.
+**Calls:** `GET /programs/{code}` (Flow 2 step 2).
+**On failure:** shows a "program not found" message on a `404`.
+
+### 9. Account page
+
+**Page:** `pages/Account.jsx`.
+**What it does:** shows the logged-in student's own account details, a log-out button, and a delete-account control.
+**Calls:** `GET /me` on load, `POST /auth/logout` for log out, `DELETE /me` for delete (Flow 1 steps 5-6).
+**Safety check:** deleting the account needs 2 steps -- ticking a confirmation checkbox before the delete button is enabled -- so a stray click can't erase an account by accident. The backend still does the real work: cascading the delete to `spm_results`, `interest_answers`, and `analysis` (Flow 3 step 4, Flow 4's cache note).
 
 ## Error States
 
@@ -243,7 +318,8 @@ Analysis turns a student's saved SPM (**Sijil Pelajaran Malaysia**) results and 
 - The reference-data routes (`/subjects`, `/universities`, `/programs`, `/programs/{code}`) need no login and read only the most recently loaded session.
 - The importer only fetches one page at a time -- it never runs requests to e-Panduan in parallel.
 - `PUT /me/results` is **upsert-only**: it never deletes a subject the payload leaves out. To remove a saved subject, a future route would need to add that on purpose.
-- `PUT /me/interest-answers` is a **full replace** every time: it always clears the student's previous answers first, then saves the new payload as the whole new set.
+- `PUT /me/interest-answers` is a **merge/upsert** (decision `0008`): each save updates only the questions it mentions, leaving every other previously-saved answer untouched. A full 20-question payload still ends up replacing the student's whole answer set, since every question is covered either way.
+- `GET /me/analysis`'s interest-area chart, Likely to love, and any interest-driven sweet spot are only ever computed once all 20 interest-test questions are answered (decision `0008`); until then they're forced to 0/empty regardless of how many (or which) questions have been answered so far.
 - `PUT /me/results` and `PUT /me/interest-answers` both delete the student's cached `analysis` row on every successful save, unconditionally -- there's no check for whether the save actually changed anything (decision `0006`).
 - `GET /me/analysis` only ever computes for, caches, and returns the logged-in student's own data -- the same access-token scoping as every other `/me` route.
 

@@ -40,6 +40,23 @@ def _first_two_questions(client) -> list[dict]:
     return questions[:2]
 
 
+def _answer_all_questions_one_tagged(client, token, tagged_option_id: int, tagged_question_id: int) -> None:
+    """Complete all 20 questions: `tagged_question_id` gets
+    `tagged_option_id` (an area-tagged option), every other question gets
+    its own "None of the above" option -- so exactly one area has any picks
+    at all, and the interest test is complete (PRD T1, decision 0008)."""
+    questions = client.get("/interest-test").json()
+    payload = []
+    for q in questions:
+        if q["id"] == tagged_question_id:
+            payload.append({"question_id": q["id"], "option_id": tagged_option_id})
+        else:
+            none_option = next(opt for opt in q["options"] if opt["text"] == "None of the above")
+            payload.append({"question_id": q["id"], "option_id": none_option["id"]})
+    resp = client.put("/me/interest-answers", json=payload, headers=_auth(token))
+    assert resp.status_code == 200
+
+
 def _non_none_option(question: dict) -> dict:
     return next(opt for opt in question["options"] if opt["text"] != "None of the above")
 
@@ -75,9 +92,12 @@ def test_analysis_empty_state_returns_200_with_both_chart_sections(client, make_
         "best_fit",
         "category",
         "computed_at",
+        "interest_test_complete",
     }
     # Chart 2 (interest areas) is never omitted -- all 9 seeded areas appear
-    # even with zero picks (PRD T1, skill S2).
+    # even with zero picks (PRD T1, skill S2). The interest test was never
+    # taken, so it's incomplete and every score is forced to 0 (decision 0008).
+    assert body["interest_test_complete"] is False
     assert len(body["interest_areas"]) == 9
     assert all(entry["score"] == 0.0 for entry in body["interest_areas"])
     # Chart 1 (subject groups) is omitted entirely when no results are saved
@@ -140,14 +160,13 @@ def test_cache_invalidation_on_answers_change(client, make_register_payload, db_
     tagged_option = _non_none_option(q1)
     area_name = _area_name_for_option(db_session, tagged_option["id"])
 
-    put_resp = client.put(
-        "/me/interest-answers",
-        json=[{"question_id": q1["id"], "option_id": tagged_option["id"]}],
-        headers=_auth(token),
-    )
-    assert put_resp.status_code == 200
+    # Complete all 20 questions (decision 0008: interest scores are only
+    # ever computed once the test is complete) with only q1 tagged to a
+    # real area.
+    _answer_all_questions_one_tagged(client, token, tagged_option["id"], q1["id"])
 
     first = client.get("/me/analysis", headers=_auth(token)).json()
+    assert first["interest_test_complete"] is True
     first_score = next(a["score"] for a in first["interest_areas"] if a["area"] == area_name)
     assert first_score > 0.0
 
@@ -155,9 +174,10 @@ def test_cache_invalidation_on_answers_change(client, make_register_payload, db_
     again = client.get("/me/analysis", headers=_auth(token)).json()
     assert again["computed_at"] == first["computed_at"]
 
-    # Retake: switch q1's answer to "None of the above" -- the tagged
-    # area's pick count (and therefore score) must drop, and the cache must
-    # have been invalidated so this is visible immediately.
+    # Retake: switch q1's answer to "None of the above" (the test is still
+    # complete -- all 20 questions are still answered) -- the tagged area's
+    # pick count (and therefore score) must drop, and the cache must have
+    # been invalidated so this is visible immediately.
     none_option = _none_option(q1)
     retake_resp = client.put(
         "/me/interest-answers",
@@ -167,6 +187,7 @@ def test_cache_invalidation_on_answers_change(client, make_register_payload, db_
     assert retake_resp.status_code == 200
 
     second = client.get("/me/analysis", headers=_auth(token)).json()
+    assert second["interest_test_complete"] is True
     second_score = next(a["score"] for a in second["interest_areas"] if a["area"] == area_name)
 
     assert second_score < first_score
@@ -182,14 +203,12 @@ def test_love_list_holds_one_item_when_only_one_area_has_a_nonzero_score(client,
     tagged_option = _non_none_option(q1)
     area_name = _area_name_for_option(db_session, tagged_option["id"])
 
-    put_resp = client.put(
-        "/me/interest-answers",
-        json=[{"question_id": q1["id"], "option_id": tagged_option["id"]}],
-        headers=_auth(token),
-    )
-    assert put_resp.status_code == 200
+    # Interest scores are only computed once the test is complete (decision
+    # 0008); complete all 20 with only q1 tagged to a real area.
+    _answer_all_questions_one_tagged(client, token, tagged_option["id"], q1["id"])
 
     body = client.get("/me/analysis", headers=_auth(token)).json()
+    assert body["interest_test_complete"] is True
 
     # Only one area has any picks at all (every other area's own Chart 2
     # score is still 0.0), so the love top-3 list holds exactly that one
@@ -197,6 +216,48 @@ def test_love_list_holds_one_item_when_only_one_area_has_a_nonzero_score(client,
     assert len(body["likely_to_love"]) == 1
     assert body["likely_to_love"][0]["area"] == area_name
     assert body["likely_to_love"][0]["score"] > 0.0
+
+
+def test_love_list_and_interest_areas_stay_empty_until_the_interest_test_is_complete(
+    client, make_register_payload, db_session
+):
+    """A part-finished interest test (decision 0008): fewer than 20
+    questions answered means `interest_areas` stays forced to 0, and
+    `likely_to_love` stays empty, even though the picks so far would
+    otherwise score a real area. Finishing the remaining questions flips
+    `interest_test_complete` and the scores appear."""
+    _, token, _ = _register_and_login(client, make_register_payload)
+    questions = client.get("/interest-test").json()
+    q1 = questions[0]
+    tagged_option = _non_none_option(q1)
+    area_name = _area_name_for_option(db_session, tagged_option["id"])
+
+    # Answer only 5 of 20 -- a real, tagged pick among them.
+    partial_payload = [{"question_id": q1["id"], "option_id": tagged_option["id"]}]
+    for q in questions[1:5]:
+        none_option = _none_option(q)
+        partial_payload.append({"question_id": q["id"], "option_id": none_option["id"]})
+    resp = client.put("/me/interest-answers", json=partial_payload, headers=_auth(token))
+    assert resp.status_code == 200
+
+    body = client.get("/me/analysis", headers=_auth(token)).json()
+    assert body["interest_test_complete"] is False
+    assert all(entry["score"] == 0.0 for entry in body["interest_areas"])
+    assert body["likely_to_love"] == []
+
+    # Finish the remaining 15 questions, all "None of the above".
+    remaining_payload = [
+        {"question_id": q["id"], "option_id": _none_option(q)["id"]} for q in questions[5:]
+    ]
+    resp = client.put("/me/interest-answers", json=remaining_payload, headers=_auth(token))
+    assert resp.status_code == 200
+
+    body = client.get("/me/analysis", headers=_auth(token)).json()
+    assert body["interest_test_complete"] is True
+    assert body["likely_to_love"] == [{"area": area_name, "score": next(
+        a["score"] for a in body["interest_areas"] if a["area"] == area_name
+    )}]
+    assert next(a["score"] for a in body["interest_areas"] if a["area"] == area_name) > 0.0
 
 
 def test_love_list_is_empty_when_interest_test_never_taken_but_excel_and_charts_unaffected(
@@ -216,8 +277,10 @@ def test_love_list_is_empty_when_interest_test_never_taken_but_excel_and_charts_
 
     body = client.get("/me/analysis", headers=_auth(token)).json()
 
-    # No interest-test answers were ever saved -- every one of the 9 areas
-    # stays at 0.0 (Chart 2 is never omitted), so the love top-3 is empty.
+    # No interest-test answers were ever saved -- the test is incomplete
+    # (decision 0008), so every one of the 9 areas stays forced to 0.0
+    # (Chart 2 is never omitted), and the love top-3 is empty.
+    assert body["interest_test_complete"] is False
     assert len(body["interest_areas"]) == 9
     assert all(entry["score"] == 0.0 for entry in body["interest_areas"])
     assert body["likely_to_love"] == []
@@ -252,10 +315,12 @@ def test_non_citizen_best_fit_has_no_programs_but_charts_still_shown(client, mak
     assert body["subject_groups"] != []
     assert len(body["interest_areas"]) == 9
     assert body["likely_to_excel"] != []
-    # This test never saves interest-test answers, so every interest score
-    # is 0.0 and likely_to_love is correctly empty under decision 0007's
-    # 0-score exclusion -- it is likely_to_excel (grade-based, unaffected by
-    # that rule) that proves the charts are still fully computed here.
+    # This test never saves interest-test answers, so the test is
+    # incomplete (decision 0008) and every interest score is forced to 0.0;
+    # likely_to_love is correctly empty -- it is likely_to_excel
+    # (grade-based, unaffected by that rule) that proves the charts are
+    # still fully computed here.
+    assert body["interest_test_complete"] is False
     assert body["likely_to_love"] == []
 
     # But a non-citizen can never be Eligible/Conditional for any program

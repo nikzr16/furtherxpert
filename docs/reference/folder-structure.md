@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** a map of where every part of FurtherXpert lives.
 > - **Why:** so anyone can find the right file fast, and put new files in the right place.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), Phase 4 (student input, backend only), and Phase 5 (rules engine, backend only) are built. Items marked *(planned)* come in later phases.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts), Phase 3 (reference data), Phase 4 (student input), Phase 5 (rules engine), and Phase 6 (client pages -- all 8 screens) are built. Items marked *(planned)* come in later phases.
 
 > **Type:** Reference | **Must stay current:** Yes -- update when structure, routes, schemas, or config change
 
@@ -65,7 +65,7 @@ furtherxpert/
 │   │   ├── api/health.py           GET /health
 │   │   ├── api/deps.py             shared dependency: finds the logged-in user from the access token
 │   │   ├── api/auth.py             POST /auth/register, /auth/login, /auth/refresh, /auth/logout
-│   │   ├── api/me.py               GET /me, DELETE /me, GET+PUT /me/results, PUT /me/interest-answers (Phase 4), GET /me/analysis (Phase 5)
+│   │   ├── api/me.py               GET /me, DELETE /me, GET+PUT /me/results, GET+PUT /me/interest-answers (Phase 4, Phase 6), GET /me/analysis (Phase 5)
 │   │   ├── api/reference.py        GET /subjects, /universities, /programs, /programs/{code} (Phase 3)
 │   │   ├── api/interest_test.py    GET /interest-test (Phase 4)
 │   │   ├── core/config.py          reads settings from .env
@@ -120,10 +120,28 @@ furtherxpert/
 │   ├── index.html
 │   └── src/
 │       ├── main.jsx                starts React
-│       ├── App.jsx                 app shell + routes
-│       ├── api.js                  calls the backend (uses VITE_API_URL)
+│       ├── App.jsx                 app shell + routes (Phase 6)
+│       ├── api.js                  calls the backend (uses VITE_API_URL) (Phase 6)
+│       ├── constants.js            shared constants: SPM grade list, required subjects (Phase 6)
+│       ├── programName.js          cleans e-Panduan markers ("#", "Baru") out of program names for display (decision 0009)
 │       ├── index.css               Tailwind import
-│       └── pages/Home.jsx          placeholder page, shows /health
+│       ├── context/
+│       │   └── AuthContext.jsx     holds the access token in memory, silent refresh on load, retry-once-on-401 (Phase 6)
+│       ├── components/
+│       │   ├── Nav.jsx             shared top navigation
+│       │   ├── ProtectedRoute.jsx  sends a logged-out visitor to Login instead of the page
+│       │   ├── RadarChartCard.jsx  reusable radar chart + a real <table> text fallback (WCAG AA) + empty states
+│       │   └── EligibilityBadge.jsx eligibility verdict badge with reasons
+│       └── pages/
+│           ├── Home.jsx            home page, shows /health
+│           ├── Register.jsx        sign-up form, explains the race question, collects consent (Phase 6)
+│           ├── Login.jsx           log-in form, generic wrong-credentials message (Phase 6)
+│           ├── SpmResults.jsx      SPM subject + grade rows, BM/Sejarah required (Phase 6)
+│           ├── InterestTest.jsx    20 questions, save-as-you-go, resumes via GET /me/interest-answers (Phase 6)
+│           ├── MyResults.jsx       both radar charts, Best Fit, eligibility badges (Phase 6)
+│           ├── Explore.jsx         browse/filter all programs, client-side filtering (Phase 6)
+│           ├── ProgramDetail.jsx   full program detail, Malay rule text, source credit (Phase 6)
+│           └── Account.jsx         account info, log out, 2-step delete confirmation (Phase 6)
 ├── sambungbelajarai/               old SambungBelajarmu code: read-only, never edit
 └── archieve-sambung/               old SambungBelajarmu archive: read-only, never edit
 ```
@@ -135,7 +153,7 @@ furtherxpert/
 | `backend/app/main.py` | Creates the FastAPI app. Allows only `FRONTEND_ORIGIN` (CORS). Plugs in routers |
 | `backend/app/api/health.py` | `GET /health`: always HTTP 200, with `{"status":"ok","db":"ok"}` or `"db":"error"` |
 | `backend/app/api/auth.py` | Account routes that don't need a login: register, log in, refresh, log out |
-| `backend/app/api/me.py` | Account routes that need a login: view or delete the current account, save/read SPM results, save interest-test answers (Phase 4), read the computed charts/Best Fit/eligibility (`GET /me/analysis`, Phase 5) |
+| `backend/app/api/me.py` | Account routes that need a login: view or delete the current account, save/read SPM results, read/save interest-test answers (Phase 4; `GET /me/interest-answers` resume/progress added Phase 6), read the computed charts/Best Fit/eligibility (`GET /me/analysis`, Phase 5) |
 | `backend/app/api/deps.py` | Shared dependency (`get_current_user`): reads the `Authorization` header, checks the access token, and looks up the matching row in `users`. Every `/me` route uses this -- never a user id typed in the request itself |
 | `backend/app/api/reference.py` | Reference-data routes, no login needed: `GET /subjects`, `GET /universities`, `GET /programs` (filter by `area`, `university`, `q`), `GET /programs/{code}` |
 | `backend/app/api/interest_test.py` | `GET /interest-test`: the 20 questions and their options, no login needed. Never returns which option maps to which interest area (Phase 4) |
@@ -156,15 +174,15 @@ furtherxpert/
 | `backend/app/schemas/user.py` | Pydantic request/response shapes for register, login, and the current-account view |
 | `backend/app/schemas/reference.py` | Pydantic request/response shapes for the reference-data routes |
 | `backend/app/schemas/spm_result.py` | Pydantic request/response shapes for `GET`/`PUT /me/results`. Validates the grade is one of `SPM_GRADES` |
-| `backend/app/schemas/interest_test.py` | Pydantic request/response shapes for `GET /interest-test` and `PUT /me/interest-answers`. The public option shape carries no area id or name |
-| `backend/app/schemas/analysis.py` | Pydantic response shape for `GET /me/analysis`: both charts, Best Fit, Sweet spot, category, `computed_at` (Phase 5) |
+| `backend/app/schemas/interest_test.py` | Pydantic request/response shapes for `GET /interest-test`, `GET`/`PUT /me/interest-answers`. The public option shape carries no area id or name. `InterestAnswersProgressOut` (Phase 6) is the saved-answers + `complete` shape for resuming a part-finished test |
+| `backend/app/schemas/analysis.py` | Pydantic response shape for `GET /me/analysis`: both charts, Best Fit, Sweet spot, category, `computed_at`, `interest_test_complete` (Phase 5; `interest_test_complete` added Phase 6, decision `0008`) |
 | `backend/app/services/auth.py` | Sign-up and login business rules: creates the account, checks the password, keeps login timing the same whether the email exists or not |
 | `backend/app/services/reference.py` | Reference-data reads: subjects, universities, and programs (with `area`/`university`/`q` filters), always from the most recently loaded session |
 | `backend/app/services/results.py` | SPM-results read and upsert: validates subject codes against the database, requires Bahasa Melayu (`BM`) and Sejarah (`SJ`) in every save, never deletes a subject the payload leaves out. Also deletes the student's cached `analysis` row on every successful save (Phase 5) |
-| `backend/app/services/interest_test.py` | Interest-test reads (question list with options) and answer replacement: a retake deletes all of a student's previous answers and inserts the new set in one transaction. Also deletes the student's cached `analysis` row on every successful save (Phase 5) |
+| `backend/app/services/interest_test.py` | Interest-test reads (question list with options) and `save_answers` (merge/upsert, decision `0008`, was a full replace before Phase 6): each save updates or inserts only the payload's questions, leaving every other saved answer untouched. Also deletes the student's cached `analysis` row on every successful save (Phase 5). `get_progress` (Phase 6) returns the student's saved answers plus whether all 20 are answered, for `GET /me/interest-answers` |
 | `backend/app/services/scoring.py` | **Pure functions, no DB session, no HTTP, no clock:** grade-to-percent, subject-group scores (Chart 1), interest-area scores (Chart 2), excel scores, top-3-with-tiebreak, Sweet spot, and Best Fit's program sort/filter (Phase 5) |
 | `backend/app/services/eligibility.py` | **Pure functions, no DB session, no HTTP, no clock:** the UPU eligibility checker. Merges syarat am + syarat khas into one rule tree and checks it with backtracking so each subject counts at most once across the whole tree (decision `0005`); returns a verdict (Eligible/Conditional/Not Eligible) with plain-English reasons (Phase 5) |
-| `backend/app/services/analysis.py` | `GET /me/analysis` orchestration: the one Phase 5 module that touches the DB and the clock. Loads a student's grades/answers/category and the current session's reference data, calls `scoring.py`/`eligibility.py`, builds Best Fit, caches the result in `analysis`. Raises `MissingGeneralRequirementsError` if the session has no syarat am row for the student's category (Phase 5) |
+| `backend/app/services/analysis.py` | `GET /me/analysis` orchestration: the one Phase 5 module that touches the DB and the clock. Loads a student's grades/answers/category and the current session's reference data, calls `scoring.py`/`eligibility.py`, builds Best Fit, caches the result in `analysis`. Raises `MissingGeneralRequirementsError` if the session has no syarat am row for the student's category (Phase 5). Gates interest scoring (`interest_areas`, `likely_to_love`) on the interest test being fully (20/20) answered, forcing 0/empty until then (Phase 6, decision `0008`) |
 | `backend/app/importer/epanduan.py` | Sequentially fetches e-Panduan's program lists and rule pages (1 request at a time, paused, retried with backoff), parses them with **selectolax** (decision `0002`), and writes a session snapshot |
 | `backend/app/importer/subjects.py` | Hand-written list mapping every Malay subject name (and old-syllabus name) seen on e-Panduan to one subject code. Raises `UnknownSubjectError` on an unmapped name, which stops the import |
 | `backend/app/importer/reference_data.py` | Hand-written university code -> name list (20 universities), and the PRD T1 interest-area mapping |
@@ -194,8 +212,9 @@ furtherxpert/
 | `GET` | `/interest-test` | No | List all 20 interest-test questions and their options. Never reveals which option maps to which interest area |
 | `GET` | `/me/results` | Yes | The logged-in student's own saved SPM results |
 | `PUT` | `/me/results` | Yes | Upsert (update-or-insert) SPM results. Requires `BM` and `SJ` in the payload, rejects bad grades, duplicate subjects, or unknown subject codes |
-| `PUT` | `/me/interest-answers` | Yes | Replace the logged-in student's interest-test answers. A retake fully replaces the old set. Rejects duplicate question ids, unknown question/option ids, or an option that doesn't belong to its question |
-| `GET` | `/me/analysis` | Yes | The logged-in student's both charts, Likely to excel/love, Sweet spot, Best Fit (up to 3 programs per area, Eligible/Conditional only), and category (A/B). Cached until the student's results or answers change |
+| `GET` | `/me/interest-answers` | Yes | The logged-in student's saved interest-test answers so far, plus whether all 20 are answered (`complete`). Lets the client resume a part-finished test (Phase 6, decision `0008`) |
+| `PUT` | `/me/interest-answers` | Yes | Merge/upsert (Phase 6, decision `0008`) the logged-in student's interest-test answers: updates or inserts only the payload's questions, leaving every other saved answer untouched. Rejects duplicate question ids, unknown question/option ids, or an option that doesn't belong to its question |
+| `GET` | `/me/analysis` | Yes | The logged-in student's both charts, Likely to excel/love, Sweet spot, Best Fit (up to 3 programs per area, Eligible/Conditional only), category (A/B), and `interest_test_complete`. Cached until the student's results or answers change. Interest scores stay forced to 0/empty until the interest test is fully (20/20) answered (decision `0008`) |
 
 > **Watch out:** every `/me` route only ever acts on the account tied to the access token. A student can never read or delete another student's account, results, or interest answers, even if they guess an id.
 
@@ -216,16 +235,31 @@ furtherxpert/
 | `spm_results` | `id`, `user_id` (FK `users`, `ON DELETE CASCADE`), `subject_id` (FK `subjects`), `grade` (checked by the database against the 10 allowed grades) | Added by migration `23947a34f766` (Phase 4). One row per subject a student has saved a grade for. Unique per (`user_id`, `subject_id`) -- `PUT /me/results` upserts on that pair |
 | `interest_questions` | `id`, `n` (unique, 1-20, the question's number in the approved set), `text` | Added by migration `23947a34f766`, loaded by `1fa628967fac` (Phase 4). The 20 product owner-approved questions from `backend/data/interest_test.json` |
 | `interest_options` | `id`, `question_id` (FK `interest_questions`, `ON DELETE CASCADE`), `text`, `area_id` (FK `interest_areas`, nullable) | Added by migration `23947a34f766`, loaded by `1fa628967fac`. 4 area-tagged options per question, plus one "None of the above" option with `area_id` NULL |
-| `interest_answers` | `id`, `user_id` (FK `users`, `ON DELETE CASCADE`), `question_id` (FK `interest_questions`), `chosen_option_id` (FK `interest_options`) | Added by migration `23947a34f766` (Phase 4). One row per (`user_id`, `question_id`) the student has answered -- unique on that pair. `PUT /me/interest-answers` deletes and reinserts all of a student's rows on every save (a retake), so a partial answer set is allowed |
+| `interest_answers` | `id`, `user_id` (FK `users`, `ON DELETE CASCADE`), `question_id` (FK `interest_questions`), `chosen_option_id` (FK `interest_options`) | Added by migration `23947a34f766` (Phase 4). One row per (`user_id`, `question_id`) the student has answered -- unique on that pair. `PUT /me/interest-answers` merges/upserts each save's rows into what's already there (decision `0008`), so a partial (save-as-you-go) answer set is allowed and previously-saved answers are never dropped by a later, smaller save |
 | `analysis` | `user_id` (FK `users`, `ON DELETE CASCADE`, **primary key** -- one row per user, not a surrogate `id`), `result` (JSONB, the full `GET /me/analysis` response), `computed_at` (its own real `DateTime`, redundant with `result["computed_at"]` so a caller can order/filter without parsing JSON) | Added by migration `3916bef04fb3` (Phase 5). A cache: the first `GET /me/analysis` after a change computes and saves a row here; later `GET`s are served from it unchanged. `PUT /me/results` and `PUT /me/interest-answers` delete the student's row here on every successful save (decision `0006`), so it never goes stale |
 
 ## Client
 
 | File | Purpose |
 |---|---|
-| `client/src/App.jsx` | Header "FurtherXpert" + page routes |
-| `client/src/api.js` | Small helper for backend calls |
-| `client/src/pages/Home.jsx` | Placeholder home page that shows the server status |
+| `client/src/App.jsx` | Header "FurtherXpert" + page routes for all 8 pages, wrapped in `AuthContext` (Phase 6) |
+| `client/src/api.js` | Helper for backend calls, including the new `GET`/`PUT /me/interest-answers` resume calls (Phase 6) |
+| `client/src/constants.js` | Shared constants: the real SPM grade list, the required-subject codes (BM, SJ) (Phase 6) |
+| `client/src/programName.js` | `displayProgram()`: hides the `#` marker (it repeats the interview flag) and turns "Baru" into a "New" badge; raw names stay in the data and search (decision 0009) |
+| `client/src/context/AuthContext.jsx` | Holds the access token in React state only (never `localStorage`/`sessionStorage`); does a silent `POST /auth/refresh` on app load with `credentials: "include"`; retries a failed call once via refresh, then routes to Login (Phase 6) |
+| `client/src/components/Nav.jsx` | Shared top navigation shown on every page (Phase 6) |
+| `client/src/components/ProtectedRoute.jsx` | Wraps a page; sends a logged-out visitor to Login instead of rendering it (Phase 6) |
+| `client/src/components/RadarChartCard.jsx` | Reusable radar chart (Recharts). Always renders a real `<table>` of the same numbers inside a `<details>` (not `display: none`), for WCAG AA (Web Content Accessibility Guidelines, level AA) accessibility, plus empty states (Phase 6) |
+| `client/src/components/EligibilityBadge.jsx` | Shows a program's Eligible/Conditional/Not Eligible verdict with its plain-English reasons (Phase 6) |
+| `client/src/pages/Home.jsx` | Home page that shows the server status |
+| `client/src/pages/Register.jsx` | Sign-up form; explains that race is collected only to check Bumiputera-only programs; collects consent (Phase 6) |
+| `client/src/pages/Login.jsx` | Log-in form; shows the backend's generic wrong-credentials message; redirects to the page the student was headed to (Phase 6) |
+| `client/src/pages/SpmResults.jsx` | SPM subject + grade rows; Bahasa Melayu and Sejarah always shown as required; grade choices limited to the real SPM grade list, backend stays authoritative (Phase 6) |
+| `client/src/pages/InterestTest.jsx` | The 20 questions; loads saved progress on mount via `GET /me/interest-answers`; saves each answer immediately via the merge/upsert `PUT`; shows live "N of 20 answered" progress; resumes correctly after a reload (Phase 6, decision `0008`) |
+| `client/src/pages/MyResults.jsx` | Both radar charts with text-table fallbacks, Best Fit list with sweet-spot/likely-to-excel/likely-to-love badges, eligibility badges with reasons, and a "finish the interest test" empty state while `interest_test_complete` is `false` (Phase 6) |
+| `client/src/pages/Explore.jsx` | Filter by interest area and university, plus free-text search; fetches `GET /programs` once and filters that list in the browser (client-side filtering) (Phase 6) |
+| `client/src/pages/ProgramDetail.jsx` | Full program info, the original Malay rule text (`text_ms`), and an e-Panduan source-credit line (Phase 6) |
+| `client/src/pages/Account.jsx` | Account info, log out, and a 2-step (checkbox-gated) delete-account confirmation (Phase 6) |
 
 ## Docker services
 

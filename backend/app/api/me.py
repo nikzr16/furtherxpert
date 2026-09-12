@@ -11,7 +11,7 @@ from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.user import User
 from app.schemas.analysis import AnalysisOut
-from app.schemas.interest_test import InterestAnswerIn, InterestAnswerOut
+from app.schemas.interest_test import InterestAnswerIn, InterestAnswerOut, InterestAnswersProgressOut
 from app.schemas.spm_result import SPMResultIn, SPMResultOut
 from app.schemas.user import UserPublic
 from app.services import analysis as analysis_service
@@ -63,14 +63,22 @@ def replace_my_results(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/me/interest-answers", response_model=InterestAnswersProgressOut)
+def read_my_interest_answers(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return interest_test_service.get_progress(db, current_user.id)
+
+
 @router.put("/me/interest-answers", response_model=list[InterestAnswerOut])
-def replace_my_interest_answers(
+def save_my_interest_answers(
     payload: list[InterestAnswerIn],
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     try:
-        return interest_test_service.replace_answers(db, current_user.id, payload)
+        return interest_test_service.save_answers(db, current_user.id, payload)
     except (
         interest_test_service.DuplicateQuestionError,
         interest_test_service.UnknownQuestionError,

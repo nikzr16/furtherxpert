@@ -46,7 +46,7 @@ Also called: **scope**.
 
 - **Accounts:** sign up, log in, log out, delete account.
 - **SPM results form:** subjects and grades, including older-syllabus subjects.
-- **Interest test:** 20 questions with 5 options each. It can be retaken.
+- **Interest test:** 20 questions with 5 options each. It can be retaken, and a part-finished test can be picked up later.
 - **Chart 1, subject strengths:** a **spider chart** (a web-shaped chart, also called a radar chart) of subject groups.
 - **Chart 2, interests:** a spider chart of 9 interest areas.
 - **Best Fit:** the top 3 areas the student will **likely excel in**, and up to 3 they'll **likely love**. An area scoring 0 interest is left out, so the "love" list can be shorter than 3, or empty if the test wasn't taken. An area in both lists is a **Sweet spot**. Each area shows up to 3 matching programs.
@@ -187,6 +187,7 @@ These are the exact rules. Section ids (T1–T8) are cited by the project skills
 | Arts | Pendidikan Seni Visual, Reka Bentuk Grafik, Produksi Multimedia |
 
 **Interest areas (Chart 2).** An area's score = the student's picks for it ÷ the most picks possible for it × 100.
+- Scores are only worked out when **all 20 questions** are answered. A part-finished test is saved as progress, and Chart 2 plus the "likely to love" list stay empty until it's finished.
 - Each answer tag belongs to **exactly one** area.
 - "None of the above" counts for nothing.
 
@@ -291,7 +292,7 @@ Programs whose NEC code matches no prefix still appear in Explore, but not in Be
 | `POST /auth/register` · `/auth/login` · `/auth/refresh` · `/auth/logout` | Accounts |
 | `GET /me` · `DELETE /me` | Current account / delete it |
 | `GET /me/results` · `PUT /me/results` | SPM results |
-| `GET /interest-test` · `PUT /me/interest-answers` | Interest test |
+| `GET /interest-test` · `GET` · `PUT /me/interest-answers` | Interest test: questions, saved progress, and saving answers |
 | `GET /me/analysis` | Both charts + Best Fit + eligibility |
 | `GET /me/analysis/summary` | AI summary (a separate call) |
 | `GET /subjects` · `GET /universities` | Form and filter lists |

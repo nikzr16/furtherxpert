@@ -174,7 +174,11 @@ def _first_two_questions_with_options(client) -> list[dict]:
     return questions[:2]
 
 
-def test_put_interest_answers_happy_path_and_retake_replaces(client, make_register_payload, db_session):
+def test_put_interest_answers_happy_path_and_partial_saves_merge(client, make_register_payload, db_session):
+    """A partial `PUT` is a merge/upsert (decision 0008), not a full
+    replace: a later save that omits a question must not delete that
+    question's previously-saved answer, and re-sending a question must
+    update it in place."""
     _, token, user_id = _register_and_login(client, make_register_payload)
     q1, q2 = _first_two_questions_with_options(client)
 
@@ -189,16 +193,17 @@ def test_put_interest_answers_happy_path_and_retake_replaces(client, make_regist
         (q2["id"], q2["options"][1]["id"]),
     }
 
-    # Retake: answer q1 differently, and don't answer q2 at all this time.
+    # Second, partial save: change q1's answer, and don't mention q2 at all.
     second_payload = [{"question_id": q1["id"], "option_id": q1["options"][2]["id"]}]
     second_resp = client.put("/me/interest-answers", json=second_payload, headers=_auth(token))
     assert second_resp.status_code == 200
 
     rows = db_session.execute(select(InterestAnswer).where(InterestAnswer.user_id == user_id)).scalars().all()
     saved = {(row.question_id, row.chosen_option_id) for row in rows}
-    # Old answers (including q2's, which the retake omitted) are gone;
-    # only the new set remains.
-    assert saved == {(q1["id"], q1["options"][2]["id"])}
+    # q1's answer was updated in place; q2's answer, omitted from the
+    # second (partial) save, is still there -- a partial PUT merges into
+    # what's already saved, it never drops an omitted question's answer.
+    assert saved == {(q1["id"], q1["options"][2]["id"]), (q2["id"], q2["options"][1]["id"])}
 
 
 def test_put_interest_answers_rejects_unknown_question_id(client, make_register_payload):
@@ -277,6 +282,69 @@ def test_interest_answers_are_scoped_to_the_caller(client, make_register_payload
 
 def test_interest_answers_require_auth(client):
     resp = client.put("/me/interest-answers", json=[])
+    assert resp.status_code in (401, 403)
+
+
+# --- GET /me/interest-answers (Phase 6: resume + completeness) --------------
+
+
+def test_get_interest_answers_empty_when_none_saved(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+
+    resp = client.get("/me/interest-answers", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json() == {"answers": [], "complete": False}
+
+
+def test_get_interest_answers_resumes_a_partial_save(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    q1, q2 = _first_two_questions_with_options(client)
+
+    payload = [
+        {"question_id": q1["id"], "option_id": q1["options"][0]["id"]},
+        {"question_id": q2["id"], "option_id": q2["options"][1]["id"]},
+    ]
+    put_resp = client.put("/me/interest-answers", json=payload, headers=_auth(token))
+    assert put_resp.status_code == 200
+
+    # A part-finished test (only 2 of 20 answered) must resume with exactly
+    # those saved answers, and `complete` must be false.
+    get_resp = client.get("/me/interest-answers", headers=_auth(token))
+    assert get_resp.status_code == 200
+    body = get_resp.json()
+    assert body["complete"] is False
+    assert {(a["question_id"], a["option_id"]) for a in body["answers"]} == {
+        (q1["id"], q1["options"][0]["id"]),
+        (q2["id"], q2["options"][1]["id"]),
+    }
+
+
+def test_get_interest_answers_complete_once_all_20_answered(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    questions = client.get("/interest-test").json()
+    assert len(questions) == 20
+
+    # Answer 19 of 20 first -- still incomplete.
+    partial_payload = [{"question_id": q["id"], "option_id": q["options"][0]["id"]} for q in questions[:19]]
+    resp = client.put("/me/interest-answers", json=partial_payload, headers=_auth(token))
+    assert resp.status_code == 200
+    assert client.get("/me/interest-answers", headers=_auth(token)).json()["complete"] is False
+
+    # Answer the last one -- now complete.
+    last = questions[19]
+    resp = client.put(
+        "/me/interest-answers",
+        json=[{"question_id": last["id"], "option_id": last["options"][0]["id"]}],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    body = client.get("/me/interest-answers", headers=_auth(token)).json()
+    assert body["complete"] is True
+    assert len(body["answers"]) == 20
+
+
+def test_interest_answers_progress_requires_auth(client):
+    resp = client.get("/me/interest-answers")
     assert resp.status_code in (401, 403)
 
 

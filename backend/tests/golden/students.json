@@ -1,5 +1,5 @@
 {
-  "_purpose": "Phase 5 stage 3 golden fixtures: 6 sample students exercising GET /me/analysis end to end (PRD T1, T2, T5) plus 3 eligibility spot-checks (see test_golden_students.py). Each student's `results` and `interest_picks` are hand-derived from the real seeded data (backend/app/importer/subjects.py, backend/data/interest_test.json, backend/data/upu/2026-2027.json).",
+  "_purpose": "Phase 5 stage 3 golden fixtures: 6 sample students exercising GET /me/analysis end to end (PRD T1, T2, T5) plus 3 eligibility spot-checks (see test_golden_students.py). Each student's `results` and `interest_picks` are hand-derived from the real seeded data (backend/app/importer/subjects.py, backend/data/interest_test.json, backend/data/upu/2026-2027.json). Phase 6 (decision 0008) note: every student who calls the interest test now answers all 20 questions -- amir/mei_ling/priya/aisyah/daniel's originally-partial pick lists are padded with 'None of the above' for every question they didn't already answer, so their interest/love scores are unchanged (None of the above contributes 0 picks to any area) while the interest test is genuinely complete, satisfying the new completeness gate. Rahman still answers none (call_interest_answers: false), so he stays incomplete, unchanged from before.",
   "students": [
     {
       "name": "amir",
@@ -28,7 +28,18 @@
         {"question_text": "What would you like to learn more about?", "option_text": "How chemicals react"},
         {"question_text": "With RM1,000 for a project, you'd…", "option_text": "Buy parts to build a gadget"},
         {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "Science or Computer Science"},
-        {"question_text": "Your dream workplace is…", "option_text": "A lab or tech company"}
+        {"question_text": "Your dream workplace is…", "option_text": "A lab or tech company"},
+        {"question_text": "On a free Saturday, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "In a group project, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "Where would you like to work?", "option_text": "None of the above"},
+        {"question_text": "Which video would you click first?", "option_text": "None of the above"},
+        {"question_text": "Which achievement would make you proudest?", "option_text": "None of the above"},
+        {"question_text": "Which task sounds most satisfying?", "option_text": "None of the above"},
+        {"question_text": "Which weekend job appeals most?", "option_text": "None of the above"},
+        {"question_text": "Which headline catches your eye?", "option_text": "None of the above"},
+        {"question_text": "How do you like to spend free time?", "option_text": "None of the above"},
+        {"question_text": "Which skill do you most want?", "option_text": "None of the above"},
+        {"question_text": "Which volunteer role would you pick?", "option_text": "None of the above"}
       ]
     },
     {
@@ -58,7 +69,18 @@
         {"question_text": "What would you like to learn more about?", "option_text": "How chemicals react"},
         {"question_text": "With RM1,000 for a project, you'd…", "option_text": "Buy parts to build a gadget"},
         {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "Science or Computer Science"},
-        {"question_text": "Your dream workplace is…", "option_text": "A lab or tech company"}
+        {"question_text": "Your dream workplace is…", "option_text": "A lab or tech company"},
+        {"question_text": "On a free Saturday, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "In a group project, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "Where would you like to work?", "option_text": "None of the above"},
+        {"question_text": "Which video would you click first?", "option_text": "None of the above"},
+        {"question_text": "Which achievement would make you proudest?", "option_text": "None of the above"},
+        {"question_text": "Which task sounds most satisfying?", "option_text": "None of the above"},
+        {"question_text": "Which weekend job appeals most?", "option_text": "None of the above"},
+        {"question_text": "Which headline catches your eye?", "option_text": "None of the above"},
+        {"question_text": "How do you like to spend free time?", "option_text": "None of the above"},
+        {"question_text": "Which skill do you most want?", "option_text": "None of the above"},
+        {"question_text": "Which volunteer role would you pick?", "option_text": "None of the above"}
       ]
     },
     {
@@ -81,7 +103,21 @@
         {"question_text": "Which video would you click first?", "option_text": "Behind the scenes of a TV show"},
         {"question_text": "Which club would you join?", "option_text": "Art or photography"},
         {"question_text": "Which task sounds most satisfying?", "option_text": "Designing the layout of a room"},
-        {"question_text": "Which headline catches your eye?", "option_text": "Local artist wins award"}
+        {"question_text": "Which headline catches your eye?", "option_text": "Local artist wins award"},
+        {"question_text": "Which topic sounds most interesting?", "option_text": "None of the above"},
+        {"question_text": "In a group project, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "Which job would you try for a day?", "option_text": "None of the above"},
+        {"question_text": "What kind of problem do you enjoy?", "option_text": "None of the above"},
+        {"question_text": "Where would you like to work?", "option_text": "None of the above"},
+        {"question_text": "Which achievement would make you proudest?", "option_text": "None of the above"},
+        {"question_text": "What would you like to learn more about?", "option_text": "None of the above"},
+        {"question_text": "Which weekend job appeals most?", "option_text": "None of the above"},
+        {"question_text": "How do you like to spend free time?", "option_text": "None of the above"},
+        {"question_text": "With RM1,000 for a project, you'd…", "option_text": "None of the above"},
+        {"question_text": "Which skill do you most want?", "option_text": "None of the above"},
+        {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "None of the above"},
+        {"question_text": "Which volunteer role would you pick?", "option_text": "None of the above"},
+        {"question_text": "Your dream workplace is…", "option_text": "None of the above"}
       ]
     },
     {
@@ -127,7 +163,18 @@
         {"question_text": "Which headline catches your eye?", "option_text": "New medicine approved for diabetes"},
         {"question_text": "With RM1,000 for a project, you'd…", "option_text": "Fund a health check-up day for your kampung"},
         {"question_text": "Which skill do you most want?", "option_text": "Caring for patients"},
-        {"question_text": "Your dream workplace is…", "option_text": "A hospital or clinic"}
+        {"question_text": "Your dream workplace is…", "option_text": "A hospital or clinic"},
+        {"question_text": "On a free Saturday, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "In a group project, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "Which job would you try for a day?", "option_text": "None of the above"},
+        {"question_text": "Where would you like to work?", "option_text": "None of the above"},
+        {"question_text": "Which club would you join?", "option_text": "None of the above"},
+        {"question_text": "Which achievement would make you proudest?", "option_text": "None of the above"},
+        {"question_text": "What would you like to learn more about?", "option_text": "None of the above"},
+        {"question_text": "Which weekend job appeals most?", "option_text": "None of the above"},
+        {"question_text": "How do you like to spend free time?", "option_text": "None of the above"},
+        {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "None of the above"},
+        {"question_text": "Which volunteer role would you pick?", "option_text": "None of the above"}
       ]
     },
     {
@@ -149,7 +196,24 @@
       "interest_picks": [
         {"question_text": "Which school activity would you pick?", "option_text": "Run a stall at the school fair"},
         {"question_text": "Which video would you click first?", "option_text": "Starting a business at 18"},
-        {"question_text": "Which achievement would make you proudest?", "option_text": "Opening your own shop"}
+        {"question_text": "Which achievement would make you proudest?", "option_text": "Opening your own shop"},
+        {"question_text": "On a free Saturday, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "Which topic sounds most interesting?", "option_text": "None of the above"},
+        {"question_text": "In a group project, you'd rather…", "option_text": "None of the above"},
+        {"question_text": "Which job would you try for a day?", "option_text": "None of the above"},
+        {"question_text": "What kind of problem do you enjoy?", "option_text": "None of the above"},
+        {"question_text": "Where would you like to work?", "option_text": "None of the above"},
+        {"question_text": "Which club would you join?", "option_text": "None of the above"},
+        {"question_text": "Which task sounds most satisfying?", "option_text": "None of the above"},
+        {"question_text": "What would you like to learn more about?", "option_text": "None of the above"},
+        {"question_text": "Which weekend job appeals most?", "option_text": "None of the above"},
+        {"question_text": "Which headline catches your eye?", "option_text": "None of the above"},
+        {"question_text": "How do you like to spend free time?", "option_text": "None of the above"},
+        {"question_text": "With RM1,000 for a project, you'd…", "option_text": "None of the above"},
+        {"question_text": "Which skill do you most want?", "option_text": "None of the above"},
+        {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "None of the above"},
+        {"question_text": "Which volunteer role would you pick?", "option_text": "None of the above"},
+        {"question_text": "Your dream workplace is…", "option_text": "None of the above"}
       ]
     }
   ]

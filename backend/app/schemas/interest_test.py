@@ -31,3 +31,15 @@ class InterestAnswerIn(BaseModel):
 class InterestAnswerOut(BaseModel):
     question_id: int
     option_id: int
+
+
+class InterestAnswersProgressOut(BaseModel):
+    """Response shape for `GET /me/interest-answers` (Phase 6 client pages):
+    the student's saved answers so far, plus whether all 20 questions have
+    been answered yet. `complete` drives the completeness gate on
+    `GET /me/analysis`'s interest chart/Best Fit (see
+    `app/services/analysis.py`) and lets the client resume a part-finished
+    test and show progress (e.g. "12 of 20")."""
+
+    answers: list[InterestAnswerOut]
+    complete: bool

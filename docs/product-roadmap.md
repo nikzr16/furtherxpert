@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** the build order for FurtherXpert, in 7 phases.
 > - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), Phase 4 (student input, backend only), and Phase 5 (rules engine, backend only) are shipped. Phase 6 (client pages) is next.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts), Phase 3 (reference data), Phase 4 (student input), Phase 5 (rules engine), and Phase 6 (client pages) are all shipped. Phase 7 (AI summary) is next.
 > - **Where the details live:** `docs/prd/furtherxpert-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
@@ -89,7 +89,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/furtherxpert-prd.md` (T7) | `client/src/` | draft | All screens, including Explore |
+| `docs/prd/furtherxpert-prd.md` (T7) | `client/src/` | shipped | Confirmed live 2026-09-13: all 8 pages built (Register, Login, SPM Results, Interest Test, My Results, Explore, Program Detail, Account) plus shared auth/nav/chart pieces. 116 backend tests pass (up from 104 -- new tests cover the interest-test partial-save and completeness-gate change, decision `0008`). `npm run build` passes. The full user journey (register through delete account, including saving results, answering the interest test partway, reloading to resume, finishing it, and seeing the analysis page change once complete) was checked at the API level and cross-checked against the page code; a manual look in a real browser is still recommended before wider rollout |
 
 ### Phase 7: AI summary
 
@@ -105,10 +105,10 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 | Concern | Introduced In | Matured In | Current State |
 |---|---|---|---|
 | Docker setup | Phase 1 | Phase 3 | Running live: db + backend + client |
-| Login and access control (JWT) | Phase 2 | Phase 4 | Backend done: sign up, log in, refresh, log out, view/delete account, plus the new `/me/results` and `/me/interest-answers` routes, all guarded by JWT (JSON Web Token, a signed login pass) and scoped to the caller only. No client screens yet |
+| Login and access control (JWT) | Phase 2 | Phase 6 | Full stack done: the backend guards every account, student-input, and analysis route with a JWT (JSON Web Token, a signed login pass), scoped to the caller only. The client (`client/src/context/AuthContext.jsx`) keeps the access token in memory only (never saved to disk), refreshes it silently on page load, and retries a failed request once via refresh before sending the student to Login |
 | Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4. Confirmed live 2026-09-12: `DELETE /me` cascades to `spm_results` and `interest_answers` too, not just the account row |
 | Database migrations (Alembic) | Phase 1 | Phase 5 | 6 migrations: the `users` table, the reference-data tables, the sesi 2026/2027 data load, the student-input tables (`spm_results`, `interest_questions`, `interest_options`, `interest_answers`), the approved interest-test seed, and the new `analysis` cache table (one row per user, `ON DELETE CASCADE` to `users`). Both data migrations still replace their own rows on each re-run, leaving everything else untouched |
-| Automated tests | Phase 1 | Phase 5 | 104 tests pass (health + accounts + importer + reference routes + student input + scoring + eligibility + analysis + golden student tests), on a separate test database |
+| Automated tests | Phase 1 | Phase 5 | 116 backend tests pass (health + accounts + importer + reference routes + student input + scoring + eligibility + analysis + golden student tests), on a separate test database. Phase 6 added no new backend test file, but extended existing ones for the interest-test partial-save/completeness change (decision `0008`); the client's checks so far are the `npm run build` pass and a manual API-level journey walk-through, not an automated test suite |
 | Rules engine (scoring, eligibility, caching) | Phase 5 | Phase 5 | `backend/app/services/scoring.py` and `eligibility.py` are pure functions (no DB); `analysis.py` loads a student's data, calls them, and caches the result in `analysis`. `PUT /me/results` and `PUT /me/interest-answers` invalidate that cache unconditionally on every successful save, so `GET /me/analysis` never serves stale numbers |
 
 ## PRD Registry

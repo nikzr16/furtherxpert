@@ -7,7 +7,7 @@ the current session's reference data, calls the pure `scoring.py` /
 Unlike `scoring.py` / `eligibility.py`, this module is deliberately **not
 pure** -- it is the one place in Phase 5 that touches the DB and the clock.
 Cache invalidation is not this module's job: `app/services/results.py`
-(`upsert_results`) and `app/services/interest_test.py` (`replace_answers`)
+(`upsert_results`) and `app/services/interest_test.py` (`save_answers`)
 delete a user's `analysis` row whenever their saved SPM results or interest
 answers change, so the next call here recomputes instead of serving stale
 data.
@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.importer.reference_data import match_interest_area
 from app.models.analysis import Analysis
 from app.models.interest_area import InterestArea
-from app.models.interest_test import InterestAnswer, InterestOption
+from app.models.interest_test import InterestAnswer, InterestOption, InterestQuestion
 from app.models.program import Program
 from app.models.requirement import GeneralRequirement, ProgramRequirement
 from app.models.spm_result import SPMResult
@@ -120,6 +120,15 @@ def get_analysis(db: DbSession, user: User) -> dict:
     ).all()
     picks_by_area = {area_name_by_id[area_id]: count for area_id, count in pick_rows if area_id in area_name_by_id}
 
+    # --- g2. Interest-test completeness gate (decision 0008): interest scores are only
+    # computed once all 20 questions are answered -- a part-finished test must never
+    # leak a partial (and therefore misleading) score into the chart or Best Fit.
+    total_questions = db.execute(select(func.count()).select_from(InterestQuestion)).scalar_one()
+    answered_questions = db.execute(
+        select(func.count(func.distinct(InterestAnswer.question_id))).where(InterestAnswer.user_id == user.id)
+    ).scalar_one()
+    interest_test_complete = total_questions > 0 and answered_questions >= total_questions
+
     # --- h. General requirements (syarat am) for this session + category ------------------
     general = db.execute(
         select(GeneralRequirement).where(
@@ -150,10 +159,17 @@ def get_analysis(db: DbSession, user: User) -> dict:
 
     # --- j. Scoring (pure functions from scoring.py) ---------------------------------------
     group_scores = subject_group_scores(grades, subject_group_of)
-    love_scores = interest_area_scores(picks_by_area, max_picks_by_area)
     excel_scores_ = excel_scores(group_scores, area_subject_groups)
+    if interest_test_complete:
+        love_scores = interest_area_scores(picks_by_area, max_picks_by_area)
+        love_top3 = top_three(love_scores, tiebreak_scores=excel_scores_, exclude_zero=True)
+    else:
+        # Completeness gate (decision 0008): until all 20 questions are
+        # answered, every interest score is forced to 0 -- a part-finished
+        # test's picks so far must never appear as a real score.
+        love_scores = {a.name: 0.0 for a in areas}
+        love_top3 = []
     excel_top3 = top_three(excel_scores_, tiebreak_scores=love_scores)
-    love_top3 = top_three(love_scores, tiebreak_scores=excel_scores_, exclude_zero=True)
     sweet = sweet_spots(excel_top3, love_top3)
 
     # --- k. Best Fit: union of excel-top3 and love-top3 areas (judgment call -- see report)
@@ -186,6 +202,7 @@ def get_analysis(db: DbSession, user: User) -> dict:
         "best_fit": best_fit,
         "category": category,
         "computed_at": computed_at.isoformat(),
+        "interest_test_complete": interest_test_complete,
     }
 
     db.add(Analysis(user_id=user.id, result=result, computed_at=computed_at))

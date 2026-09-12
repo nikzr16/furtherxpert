@@ -139,7 +139,7 @@ Each phase runs: build → test → review → docs. A phase is done when its ch
 1. **New interest test:** write 20 new questions, each with 4 answers + "None of the above". Each answer is tagged to **exactly one** of the 9 areas. Keep areas roughly balanced. **The questions are drafted in chat and approved by the product owner before seeding.**
 2. **Tables:** `spm_results` (user, subject, grade), `interest_questions`, `interest_options` (with area), `interest_answers` (user, question, option). Student tables use `ON DELETE CASCADE` to `users`.
 3. **Seed migration** for the approved questions.
-4. **Routes:** `GET/PUT /me/results`, `GET /interest-test`, `PUT /me/interest-answers`.
+4. **Routes:** `GET/PUT /me/results`, `GET /interest-test`, `GET/PUT /me/interest-answers` (the GET returns saved progress so a part-finished test can be resumed; scores wait until all 20 are answered).
    - Validate grades against the SPM grade list.
    - Require BM and Sejarah rows.
    - Reject unknown subjects.

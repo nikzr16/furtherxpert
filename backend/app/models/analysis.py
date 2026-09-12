@@ -13,7 +13,7 @@ with `result["computed_at"]`) so a caller can order/filter by it without
 parsing JSONB.
 
 Cache invalidation is not this module's job: `app/services/results.py`
-(`upsert_results`) and `app/services/interest_test.py` (`replace_answers`)
+(`upsert_results`) and `app/services/interest_test.py` (`save_answers`)
 delete a user's row here whenever their SPM results or interest answers
 change, so the next `GET /me/analysis` recomputes.
 """

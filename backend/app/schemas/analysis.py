@@ -42,3 +42,10 @@ class AnalysisOut(BaseModel):
     best_fit: list[BestFitArea]
     category: str
     computed_at: str
+    # Whether all 20 interest-test questions are answered yet (decision
+    # 0008). Interest scores (`interest_areas`, `likely_to_love`, and any
+    # sweet spot that depends on it) are only ever computed once this is
+    # `true` -- until then every `interest_areas` entry is forced to 0.0
+    # and `likely_to_love` stays empty, so the client can show "finish the
+    # interest test" instead of a premature/partial chart.
+    interest_test_complete: bool

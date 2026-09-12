@@ -113,6 +113,7 @@ def _assert_matches_expected(body: dict, expected: dict) -> None:
     assert body["sweet_spots"] == expected["sweet_spots"]
 
     assert body["category"] == expected["category"]
+    assert body["interest_test_complete"] == expected["interest_test_complete"]
 
 
 def _load_expected(name: str) -> dict:
