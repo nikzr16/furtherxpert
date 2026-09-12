@@ -1,6 +1,6 @@
 """Application settings, read from environment variables (.env at repo root).
 
-See docs/prd/sambungbelajarmu-v2-prd.md T8 for the full env var list.
+See docs/prd/furtherxpert-prd.md T8 for the full env var list.
 """
 
 from pydantic import field_validator

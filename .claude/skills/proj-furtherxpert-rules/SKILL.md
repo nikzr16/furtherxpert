@@ -1,11 +1,11 @@
 ---
-name: proj-sambung-rules
-description: SambungBelajarmu.ai domain rulebook — SPM grade points, subject groups, interest-area scoring, Best Fit, UPU syarat am/khas eligibility (categories A/B, counts-once, Bumiputera, Conditional), reference-data import via Alembic, and the golden sample students. Use before building or reviewing anything that touches scoring, eligibility, reference data, or the interest test.
+name: proj-furtherxpert-rules
+description: FurtherXpert domain rulebook — SPM grade points, subject groups, interest-area scoring, Best Fit, UPU syarat am/khas eligibility (categories A/B, counts-once, Bumiputera, Conditional), reference-data import via Alembic, and the golden sample students. Use before building or reviewing anything that touches scoring, eligibility, reference data, or the interest test.
 ---
 
-# SambungBelajarmu.ai rules
+# FurtherXpert rules
 
-Source of truth: `docs/prd/sambungbelajarmu-v2-prd.md` T1, T2, T5. This skill is the working
+Source of truth: `docs/prd/furtherxpert-prd.md` T1, T2, T5. This skill is the working
 checklist; if it disagrees with the PRD, the PRD wins. Report the mismatch.
 
 ## 1. Where the rules live

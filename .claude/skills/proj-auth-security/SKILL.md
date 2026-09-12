@@ -1,11 +1,11 @@
 ---
 name: proj-auth-security
-description: SambungBelajarmu.ai login and privacy checklist — stateless JWT (access + refresh), argon2 passwords, rate limiting, per-user data scoping, CORS, PDPA 2010 data minimisation, logging bans, and GPT-5 data limits. Use before building or reviewing auth, /me endpoints, sign-up, account deletion, logging, or the AI summary.
+description: FurtherXpert login and privacy checklist — stateless JWT (access + refresh), argon2 passwords, rate limiting, per-user data scoping, CORS, PDPA 2010 data minimisation, logging bans, and GPT-5 data limits. Use before building or reviewing auth, /me endpoints, sign-up, account deletion, logging, or the AI summary.
 ---
 
 # Login and privacy checklist
 
-Source of truth: `docs/prd/sambungbelajarmu-v2-prd.md` T3–T4.
+Source of truth: `docs/prd/furtherxpert-prd.md` T3–T4.
 
 ## 1. Tokens (stateless JWT)
 

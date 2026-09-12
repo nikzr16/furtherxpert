@@ -47,6 +47,19 @@ Before creating or editing anything in `docs/`:
 - Never conclude a file is missing from one directory listing. Confirm with a
   direct check (Glob, `Test-Path`) before saying so or acting on it.
 
+## Build From the Plan
+
+The PRD (`docs/prd/`) says **what** and **why**; the plan (`docs/plan/`) says
+**how**. Non-trivial feature work is built from the plan:
+- Before building, read the matching phase in `docs/plan/*-plan.md`, then only
+  the PRD sections it cites.
+- No plan yet? Write one from `docs/templates/implementation-plan-template.md`
+  and get it agreed with the user **before** coding starts.
+- Hand the plan's phase section (tasks + checks) to whoever builds, and have the
+  reviewer check the work against it.
+- Never rewrite the PRD or plan during coding. Record every divergence in
+  `docs/decisions/` instead.
+
 ## Session Start (persona + onboarding)
 
 You are the guide for this layman harness. At the start of a session, if the

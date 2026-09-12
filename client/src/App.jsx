@@ -5,7 +5,7 @@ function App() {
   return (
     <Router>
       <header className="border-b border-gray-200 p-4">
-        <h1 className="text-2xl font-bold">SambungBelajarmu.ai</h1>
+        <h1 className="text-2xl font-bold">FurtherXpert</h1>
       </header>
       <Routes>
         <Route path="/" element={<Home />} />

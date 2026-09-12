@@ -1,7 +1,7 @@
 # proj-rules-change.yml: change scoring, UPU eligibility, the interest test, or reference data.
 # Higher priority than proj-feature so rule/data wording routes here.
 
-name: SambungBelajarmu Rules Change
+name: FurtherXpert Rules Change
 description: Change scoring formulas, UPU eligibility logic, interest-test questions/tags, area mappings, or the UPU reference data (import + Alembic data migration), guarded by the golden sample-student tests.
 
 match:
@@ -11,10 +11,12 @@ match:
 steps:
   - id: change
     agent: executor
-    skill: proj-sambung-rules
+    skill: proj-furtherxpert-rules
     action: >
-      Make the requested rule or data change following the proj-sambung-rules skill
-      and docs/prd/sambungbelajarmu-v2-prd.md T1, T2, T5. Reference data changes go through the e-Panduan
+      Make the requested rule or data change following the proj-furtherxpert-rules skill,
+      docs/prd/furtherxpert-prd.md T1, T2, T5, and the matching phase in
+      docs/plan/furtherxpert-plan.md. If the change alters behaviour, update
+      docs/furtherxpert-workflow.md; record divergences in docs/decisions/. Reference data changes go through the e-Panduan
       snapshot + a new Alembic data migration, never hand-edited rows. If the change
       is intended to alter golden outputs, update backend/tests/golden/expected/ and
       state exactly which rule changed and why. Report changed paths.
@@ -37,7 +39,7 @@ steps:
     agent: proj.rules-reviewer
     requires: [golden]
     action: >
-      Review the change against the proj-sambung-rules checklist. Pay special
+      Review the change against the proj-furtherxpert-rules checklist. Pay special
       attention to counts-once, category A/B selection, hard stops, and any
       golden expected-value edits (each must be justified). Emit APPROVE, REVISE, or BLOCK.
     verdict_contract: ["APPROVE", "REVISE", "BLOCK"]

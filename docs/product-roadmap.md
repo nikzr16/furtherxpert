@@ -1,10 +1,10 @@
 # Product Roadmap
 
 > **Quick summary**
-> - **What:** the build order for SambungBelajarmu.ai v2, in 7 phases.
+> - **What:** the build order for FurtherXpert, in 7 phases.
 > - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** Phase 1 (foundation) and Phase 2 (accounts, backend only) are shipped. Phase 3 (reference data) is next.
-> - **Where the details live:** `docs/prd/sambungbelajarmu-v2-prd.md`.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), and Phase 3 (reference data) are shipped. Phase 4 (student input) is next.
+> - **Where the details live:** `docs/prd/furtherxpert-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
 
@@ -27,7 +27,7 @@ phase's graduation criteria pass.
 
 ## Product Vision
 
-SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at and what they love. It then shows the public-university courses they can really get into, checked against official rules.
+FurtherXpert helps every Malaysian SPM holder see what they're best at and what they love. It then shows the public-university courses they can really get into, checked against official rules.
 
 ## Phasing Strategy
 
@@ -39,12 +39,12 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 ### Phase 1: Foundation
 
-**Trigger:** PRD v2 agreed (2026-09-12).
+**Trigger:** PRD agreed (2026-09-12).
 **Graduation criteria:** backend tests pass, the client build passes, and the Docker setup file is valid.
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T8) | `docker-compose.yml`, `backend/`, `client/` | shipped | Confirmed live 2026-09-12: all 3 services start, `/health` reports `db: ok`, client loads |
+| `docs/prd/furtherxpert-prd.md` (T8) | `docker-compose.yml`, `backend/`, `client/` | shipped | Confirmed live 2026-09-12: all 3 services start, `/health` reports `db: ok`, client loads |
 
 ### Phase 2: Accounts
 
@@ -53,7 +53,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T3, T4) | `backend/app/api/`, `backend/app/services/` | shipped | Backend only. Sign up, log in, refresh, log out, view/delete account. No screens yet (client pages come in Phase 6) |
+| `docs/prd/furtherxpert-prd.md` (T3, T4) | `backend/app/api/`, `backend/app/services/` | shipped | Backend only. Sign up, log in, refresh, log out, view/delete account. No screens yet (client pages come in Phase 6) |
 
 ### Phase 3: Reference data
 
@@ -62,7 +62,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T2, T5) | `backend/app/importer/`, `backend/data/upu/`, `backend/migrations/` | draft | e-Panduan importer + data migration |
+| `docs/prd/furtherxpert-prd.md` (T2, T5) | `backend/app/importer/`, `backend/data/upu/`, `backend/migrations/` | shipped | Confirmed live 2026-09-12: sesi 2026/2027 loaded -- 20 universities, 166 category-A programs (11 of the 20 universities), 162 category-B rule sets, 328 `program_requirements` rows, 117 subjects, 9 interest areas. 100% fully parsed, both categories (no `unparsed` rows; `unverifiable` rows are interview notes only). 43 backend tests pass. Live-checked: `GET /subjects`, `/universities`, `/programs?area=...`, `/programs/UE4481001` all return 200 |
 
 ### Phase 4: Student input
 
@@ -71,7 +71,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T1, T6) | `backend/app/api/`, `backend/app/models/` | draft | Features: SPM results, interest test |
+| `docs/prd/furtherxpert-prd.md` (T1, T6) | `backend/app/api/`, `backend/app/models/` | draft | Features: SPM results, interest test |
 
 ### Phase 5: Rules engine
 
@@ -80,7 +80,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T1, T2) | `backend/app/services/` | draft | Charts' numbers, Best Fit, eligibility |
+| `docs/prd/furtherxpert-prd.md` (T1, T2) | `backend/app/services/` | draft | Charts' numbers, Best Fit, eligibility |
 
 ### Phase 6: Client pages
 
@@ -89,7 +89,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T7) | `client/src/` | draft | All screens, including Explore |
+| `docs/prd/furtherxpert-prd.md` (T7) | `client/src/` | draft | All screens, including Explore |
 
 ### Phase 7: AI summary
 
@@ -98,7 +98,7 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` (T4) | `backend/app/services/`, `client/src/` | draft | GPT-5 gets scores only |
+| `docs/prd/furtherxpert-prd.md` (T4) | `backend/app/services/`, `client/src/` | draft | GPT-5 gets scores only |
 
 ## Cross-Cutting Concerns
 
@@ -107,22 +107,23 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 | Docker setup | Phase 1 | Phase 3 | Running live: db + backend + client |
 | Login and access control (JWT) | Phase 2 | Phase 4 | Backend done: sign up, log in, refresh, log out, view/delete account, all guarded by JWT (JSON Web Token, a signed login pass). No client screens yet |
 | Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4 |
-| Database migrations (Alembic) | Phase 1 | Phase 3 | 1 migration: the `users` table |
-| Automated tests | Phase 1 | Phase 5 | 14 tests pass (health + accounts), on a separate test database |
+| Database migrations (Alembic) | Phase 1 | Phase 3 | 3 migrations: the `users` table, the reference-data tables, and the sesi 2026/2027 data load. A data migration replaces one session's rows on each re-run, other sessions untouched |
+| Automated tests | Phase 1 | Phase 5 | 43 tests pass (health + accounts + importer + reference routes), on a separate test database |
 
 ## PRD Registry
 
 | PRD | Phase | Module | Status |
 |---|---|---|---|
-| `docs/prd/sambungbelajarmu-v2-prd.md` | 1–7 | `backend/`, `client/` | in-progress |
+| `docs/prd/furtherxpert-prd.md` (plan: `docs/plan/furtherxpert-plan.md`) | 1–7 | `backend/`, `client/` | in-progress |
 
 ## Prioritization Log
 
 | Date | Change | Reason |
 |---|---|---|
 | 2026-09-12 | Set the 7-phase order | Each phase relies on the one before it |
+| 2026-09-12 | Added the implementation plan before Phase 3 | Phases 1–2 were built from the PRD alone; from Phase 3 on, builds follow the plan |
 
-## Later (not in v2)
+## Later (not in the first release)
 
 - Admin editing screens
 - Private universities
@@ -135,6 +136,8 @@ SambungBelajarmu.ai helps every Malaysian SPM holder see what they're best at an
 | Document | Type | Relationship |
 |---|---|---|
 | `docs/documentation-standard.md` | Standard | Governs how all docs are maintained |
-| `docs/prd/sambungbelajarmu-v2-prd.md` | Intent (PRD) | What each phase builds, and why |
+| `docs/prd/furtherxpert-prd.md` | Intent (PRD) | What each phase builds, and why |
+| `docs/plan/furtherxpert-plan.md` | Plan | How each phase is built: tasks and checks |
+| `docs/furtherxpert-workflow.md` | Workflow | How the app behaves today |
 | `docs/reference/folder-structure.md` | Reference | Structural placement of modules |
 | `docs/decisions/NNNN-*.md` | Decision log | Deviations that may affect roadmap |

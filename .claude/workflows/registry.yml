@@ -24,6 +24,6 @@ routes:
     enabled: true
   - id: proj-feature
     workflow: proj-feature.yml
-    description: Build a PRD v2 feature or roadmap phase in backend/ and/or client/
+    description: Build a PRD feature or roadmap phase in backend/ and/or client/
     match: { intent: [feature, phase, build, implement, endpoint, page, api, client, backend, auth, login, register, chart, explore, docker, summary], priority: 50 }
     enabled: true

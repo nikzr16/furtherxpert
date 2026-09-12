@@ -1,17 +1,17 @@
-# SambungBelajarmu.ai v2
+# FurtherXpert
 
 > **What kind of doc is this?** A product brief, also called a **PRD** (Product Requirements Document). It says **what** we're building and **why**. The technical details section at the end gives the exact rules the builder needs.
 >
 > **Keep it updated?** No. If plans change while building, don't edit this doc. Add a note to the decision log (`docs/decisions/`) instead.
 
 <!-- AI Context
-Role: This doc captures what SambungBelajarmu.ai v2 should do and why. It is the
+Role: This doc captures what FurtherXpert should do and why. It is the
 single source of truth for product behaviour. The "Technical details" section
 (T1–T8) holds the exact rules; skills and code comments cite those section ids.
 Reader: a layman. Follow `docs/layman-guide.md`.
 Do not rewrite this doc during coding. If the build drifts from what's written
 here, add a decision log entry instead.
-v2 is a full revamp. Older v1 docs and code in `sambungbelajarai/` and
+FurtherXpert is a full revamp. The older SambungBelajarmu docs and code in `sambungbelajarai/` and
 `archieve-sambung/` do not define behaviour.
 -->
 
@@ -62,11 +62,11 @@ Also called: **non-goals** or **out of scope**.
 
 - **Private universities** (IPTS), because the first version focuses on the official public-university system.
 - **Asasi, Matrikulasi, polytechnics, Kolej Komuniti, degrees**, because diplomas come first. Other routes can follow later.
-- **Financial aid, maps, chat**, because v2 focuses on "what suits me" and "can I get in".
+- **Financial aid, maps, chat**, because FurtherXpert focuses on "what suits me" and "can I get in".
 - **Malay-language screens**, because English is simpler to start with. Official rule text is still shown in its original Malay.
 - **Calculating the student's own merit score**, because UPU's merit formula is a separate project. We only show each program's average merit.
 - **Admin screens**, because the data comes from official imports for now. The database is ready for them later.
-- **Teacher or parent dashboards**, because students are the only users in v2.
+- **Teacher or parent dashboards**, because students are the only users for now.
 
 > **Why this matters:** writing this down stops the project from quietly growing bigger than planned.
 
@@ -97,14 +97,14 @@ Also called: **constraints**.
 - **Privacy law.** Follow Malaysia's **PDPA** (Personal Data Protection Act 2010). Collect only what's needed (T4).
 - **Race is asked, carefully.** Some programs are for Bumiputera students only. So sign-up asks for race, and uses it **only** for that check.
 - **Tools we must use:** FastAPI, React, Tailwind CSS, Recharts, PostgreSQL, Docker, uv, Alembic, and OpenAI GPT-5 (T8).
-- **Don't touch** the old v1 folders `sambungbelajarai/` and `archieve-sambung/`.
+- **Don't touch** the old SambungBelajarmu folders `sambungbelajarai/` and `archieve-sambung/`.
 
 ## 7. Decisions already made
 
 | Decision | Why we chose it |
 |---|---|
-| Full revamp: the v1 aim doesn't apply | The product goal changed to "strengths + interests + eligibility" |
-| UA diplomas only | Keeps v2 focused. Other routes can follow later |
+| Full revamp: the old SambungBelajarmu aim doesn't apply | The product goal changed to "strengths + interests + eligibility" |
+| UA diplomas only | Keeps the first release focused. Other routes can follow later |
 | Cover UPU groups A and B | Older SPM holders apply too, and their rules can differ |
 | Follow UPU rules exactly | Students need answers they can trust |
 | Ask race at sign-up | 81 of 166 UA diplomas are Bumiputera-only. Guessing would mislead students |

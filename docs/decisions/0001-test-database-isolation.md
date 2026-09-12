@@ -27,7 +27,7 @@ developer's own database (the one Docker Compose starts for local work).
 ## Decision
 
 Tests that touch the database (`backend/tests/test_auth.py`) run against a
-dedicated `sambungbelajarmu_test` Postgres database on the same Postgres
+dedicated `furtherxpert_test` Postgres database on the same Postgres
 server used for local development, not the dev database itself:
 
 - The test database is created automatically on first run if it doesn't

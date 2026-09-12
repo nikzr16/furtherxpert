@@ -1,6 +1,6 @@
 """Test-only environment setup.
 
-Sets required env vars (docs/prd/sambungbelajarmu-v2-prd.md T8) with dummy values before any
+Sets required env vars (docs/prd/furtherxpert-prd.md T8) with dummy values before any
 test module imports `app.*`, so `app.core.config.Settings()` (instantiated at
 import time) succeeds without a real `.env` or a live Postgres instance.
 """
@@ -44,7 +44,7 @@ os.environ.setdefault("FRONTEND_ORIGIN", "http://localhost:5173")
 # this can never accidentally resolve to the real dev database.
 
 _BASE_DATABASE_URL = os.environ["DATABASE_URL"]
-_DEFAULT_TEST_DATABASE_URL = _BASE_DATABASE_URL.rsplit("/", 1)[0] + "/sambungbelajarmu_test"
+_DEFAULT_TEST_DATABASE_URL = _BASE_DATABASE_URL.rsplit("/", 1)[0] + "/furtherxpert_test"
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", _DEFAULT_TEST_DATABASE_URL)
 
 if not TEST_DATABASE_URL.rsplit("/", 1)[-1].endswith("_test"):

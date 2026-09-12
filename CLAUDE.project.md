@@ -14,15 +14,15 @@ When guidance conflicts:
 
 ## Project Overview
 
-**SambungBelajarmu.ai v2** helps Malaysian SPM holders see what they will
+**FurtherXpert** helps Malaysian SPM holders see what they will
 **likely excel in** (from SPM grades) and **likely love most** (from a
 20-question interest test), shown as two spider charts, plus the **UA diploma
 programs** they qualify for under official **UPU** rules (syarat am + syarat khas).
 
-The single source of truth for behaviour is `docs/prd/sambungbelajarmu-v2-prd.md`
-(exact rules in its "Technical details" sections T1–T8). v2 is a full
-revamp: never reason from the old v1 code or PRD, and don't write about why v1
-features were dropped.
+The single source of truth for behaviour is `docs/prd/furtherxpert-prd.md`
+(exact rules in its "Technical details" sections T1–T8). FurtherXpert is a full
+revamp of the old SambungBelajarmu app: never reason from that old code or
+PRD, and don't write about why its features were dropped.
 
 ## Tech Stack
 
@@ -39,13 +39,15 @@ features were dropped.
 - **`client/`**: React app.
 - **`docs/`**: docs-first source of truth. Follow `docs/documentation-standard.md`,
   use `docs/templates/`, and write per `docs/layman-guide.md`.
-  - `docs/prd/sambungbelajarmu-v2-prd.md`: the PRD.
+  - `docs/prd/furtherxpert-prd.md`: the PRD (what and why).
+  - `docs/plan/furtherxpert-plan.md`: the plan (how). **Builds follow it.**
+  - `docs/furtherxpert-workflow.md`: how the app behaves today.
   - `docs/product-roadmap.md`: phase order and status.
   - `docs/project-knowledge.md`: background knowledge (starter).
   - `docs/reference/folder-structure.md`: structure reference.
   - `docs/decisions/`: decision log.
   - `docs/draft/` is the user's scratch space. Never read it unless explicitly referenced.
-- **`sambungbelajarai/`, `archieve-sambung/`**: old v1 code. **Read-only reference. Never edit, never import from.**
+- **`sambungbelajarai/`, `archieve-sambung/`**: the previous SambungBelajarmu app. **Read-only reference. Never edit, never import from.**
 
 ## Commands
 
@@ -62,9 +64,10 @@ features were dropped.
 
 ## Code Conventions
 
-1. **Docs-first:** read `docs/product-roadmap.md` and the relevant PRD section before feature
-   work; follow `docs/documentation-standard.md` for doc maintenance and the session-close
-   checklist.
+1. **Docs-first:** before feature work, read `docs/product-roadmap.md`, then the phase's
+   section in `docs/plan/furtherxpert-plan.md` (build from it), then the PRD sections it
+   cites. Never edit the PRD or plan during coding; log divergences in `docs/decisions/`.
+   Follow `docs/documentation-standard.md` for doc maintenance and the session-close checklist.
 2. **Rules live in the backend.** Scoring and UPU eligibility are pure Python
    functions (no DB or HTTP inside), so they are unit-testable. The client only
    displays results; it never recomputes scores.
@@ -73,7 +76,7 @@ features were dropped.
    `app/core/` (config, db, security).
 4. Type hints everywhere in Python; functional components + hooks in React.
 5. Before the rules or the auth code change, follow the matching project skill:
-   - `.claude/skills/proj-sambung-rules/SKILL.md`: scoring, UPU and data.
+   - `.claude/skills/proj-furtherxpert-rules/SKILL.md`: scoring, UPU and data.
    - `.claude/skills/proj-auth-security/SKILL.md`: login and privacy.
 
 ## Coding Principles (Karpathy guidelines)
@@ -125,7 +128,7 @@ by overbuilding, and questions come *before* mistakes, not after.
 
 ## Domain Rules
 
-Full detail: `docs/prd/sambungbelajarmu-v2-prd.md` T1–T4 and the `proj-sambung-rules` skill.
+Full detail: `docs/prd/furtherxpert-prd.md` T1–T4 and the `proj-furtherxpert-rules` skill.
 
 1. **Scope:** UA diploma programs only, UPU categories A (latest SPM) and B (older SPM).
 2. **Grade points:** A+ 9, A 8, A- 7, B+ 6, B 5, C+ 4, C 3, D 2, E 1, G 0. There are no B-, C-, or F grades in SPM.
@@ -163,7 +166,7 @@ Full detail: `docs/prd/sambungbelajarmu-v2-prd.md` T1–T4 and the `proj-sambung
 - Scoring or UPU changes must keep the **golden tests** passing (`backend/tests/golden/`).
   - Only update expected values when the rule change is intended, and say so.
 - Treat tests as part of implementation, not a follow-up task.
-- Never rewrite `docs/prd/sambungbelajarmu-v2-prd.md` during coding. Record divergences in `docs/decisions/`.
+- Never rewrite `docs/prd/furtherxpert-prd.md` during coding. Record divergences in `docs/decisions/`.
 - **Session close:** run the session-close checklist in `docs/documentation-standard.md`.
   - Update phase status in `docs/product-roadmap.md`.
   - Keep `docs/reference/folder-structure.md` in sync with structural changes.

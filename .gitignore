@@ -18,3 +18,10 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .claude/settings.local.json
+
+# ── Importer resume cache (raw HTML, not a deliverable -- see
+# backend/app/importer/epanduan.py --cache-dir) ────────────────────────────────
+backend/data/upu/.cache/
+
+# Windows/MSYS crash dumps
+*.stackdump

@@ -1,8 +1,8 @@
-# proj-feature.yml: build a SambungBelajarmu.ai v2 feature or roadmap phase.
+# proj-feature.yml: build a FurtherXpert feature or roadmap phase.
 # Route: feature / phase / page / endpoint / auth work on backend/ or client/.
 
-name: SambungBelajarmu Feature
-description: Build a PRD v2 feature or roadmap phase in backend/ and/or client/, test it, review it against the domain and privacy rules, then sync the roadmap and reference docs.
+name: FurtherXpert Feature
+description: Build a PRD feature or roadmap phase in backend/ and/or client/, test it, review it against the domain and privacy rules, then sync the roadmap and reference docs.
 
 match:
   intent: [feature, phase, build, implement, endpoint, page, api, client, backend, auth, login, register, chart, explore, docker, summary]
@@ -13,10 +13,13 @@ steps:
     agent: executor
     skill: execute-plan
     action: >
-      Implement the requested feature or roadmap phase exactly as specified in
-      docs/prd/sambungbelajarmu-v2-prd.md (read only the relevant sections) and CLAUDE.project.md.
+      Build from the plan: read the phase's section in docs/plan/furtherxpert-plan.md
+      first (tasks, components, checks), then the PRD sections it cites in
+      docs/prd/furtherxpert-prd.md for the exact rules, plus CLAUDE.project.md and
+      docs/furtherxpert-workflow.md for current behaviour. If you must diverge from the
+      plan, say so in your report (the docs step records it in docs/decisions/).
       Before touching scoring, eligibility, reference data, or the interest test, read
-      .claude/skills/proj-sambung-rules/SKILL.md. Before touching auth, /me endpoints,
+      .claude/skills/proj-furtherxpert-rules/SKILL.md. Before touching auth, /me endpoints,
       sign-up, logging, or the AI summary, read .claude/skills/proj-auth-security/SKILL.md.
       Write tests alongside the code. Never edit sambungbelajarai/ or archieve-sambung/.
       Report the changed paths and the commands you ran.
@@ -40,7 +43,7 @@ steps:
     agent: proj.rules-reviewer
     requires: [test]
     action: >
-      Review the build step's changed paths against PRD v2 and your preloaded
+      Review the build step's changed paths against PRD and your preloaded
       rule skills. Emit APPROVE, REVISE (fixable, send back to build), or BLOCK
       (needs a product decision).
     verdict_contract: ["APPROVE", "REVISE", "BLOCK"]
@@ -59,10 +62,14 @@ steps:
     agent: executor
     requires: [review]
     action: >
-      Update docs/product-roadmap.md statuses for the features or phases touched
-      (shipped only if their acceptance criteria pass). Update
-      docs/reference/folder-structure.md if folders, routes, tables, or config
-      changed. Never edit docs/prd/sambungbelajarmu-v2-prd.md; record any divergence in docs/decisions/.
+      Follow docs/documentation-standard.md (session-close checklist) and write in
+      layman style per docs/layman-guide.md. Update docs/product-roadmap.md statuses for
+      the phases touched (shipped only if their checks pass). Update
+      docs/furtherxpert-workflow.md with any new or changed behaviour (one Flow
+      section per feature). Update docs/reference/folder-structure.md if folders, routes,
+      tables, or config changed. Never edit the PRD or the plan; record every divergence
+      from either, and every design trade-off, as a new docs/decisions/NNNN-*.md entry
+      from docs/templates/decision-log-template.md.
       Emit CHANGED if docs were updated, NOOP if nothing needed updating.
     verdict_contract: ["CHANGED", "NOOP"]
     on_complete:
