@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** the build order for FurtherXpert, in 7 phases.
 > - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), and Phase 4 (student input, backend only) are shipped. Phase 5 (rules engine) is next.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), Phase 4 (student input, backend only), and Phase 5 (rules engine, backend only) are shipped. Phase 6 (client pages) is next.
 > - **Where the details live:** `docs/prd/furtherxpert-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
@@ -80,7 +80,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/furtherxpert-prd.md` (T1, T2) | `backend/app/services/` | draft | Charts' numbers, Best Fit, eligibility |
+| `docs/prd/furtherxpert-prd.md` (T1, T2) | `backend/app/services/` | shipped | Confirmed live 2026-09-13: `GET /me/analysis` computes both charts (subject-group scores, interest-area scores), Best Fit, and eligibility, and caches the result in the new `analysis` table. 104 backend tests pass (up from 59), including golden tests for 6 sample students (`backend/tests/golden/`) -- Amir/Mei Ling share identical grades and answers but differ by race, proving a Bumiputera-only program (`UE4481001`) splits them (Amir Eligible, Mei Ling Not Eligible) while a non-Bumiputera-only equivalent (`UA4481001`) makes Mei Ling Eligible too; a counts-once trap (one subject can't satisfy two rule clauses); category A vs B by `spm_year`; cache invalidation on both `PUT /me/results` and `PUT /me/interest-answers`; cross-user isolation; and a non-citizen still gets full charts with an empty Best Fit. Live smoke test also passed: register, save results + answers, `GET /me/analysis` showed sane charts/Best Fit/reasons, `DELETE /me` cleaned up |
 
 ### Phase 6: Client pages
 
@@ -107,8 +107,9 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 | Docker setup | Phase 1 | Phase 3 | Running live: db + backend + client |
 | Login and access control (JWT) | Phase 2 | Phase 4 | Backend done: sign up, log in, refresh, log out, view/delete account, plus the new `/me/results` and `/me/interest-answers` routes, all guarded by JWT (JSON Web Token, a signed login pass) and scoped to the caller only. No client screens yet |
 | Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4. Confirmed live 2026-09-12: `DELETE /me` cascades to `spm_results` and `interest_answers` too, not just the account row |
-| Database migrations (Alembic) | Phase 1 | Phase 4 | 5 migrations: the `users` table, the reference-data tables, the sesi 2026/2027 data load, the student-input tables (`spm_results`, `interest_questions`, `interest_options`, `interest_answers`), and the approved interest-test seed. Both data migrations replace their own rows on each re-run, leaving everything else untouched |
-| Automated tests | Phase 1 | Phase 5 | 59 tests pass (health + accounts + importer + reference routes + student input), on a separate test database |
+| Database migrations (Alembic) | Phase 1 | Phase 5 | 6 migrations: the `users` table, the reference-data tables, the sesi 2026/2027 data load, the student-input tables (`spm_results`, `interest_questions`, `interest_options`, `interest_answers`), the approved interest-test seed, and the new `analysis` cache table (one row per user, `ON DELETE CASCADE` to `users`). Both data migrations still replace their own rows on each re-run, leaving everything else untouched |
+| Automated tests | Phase 1 | Phase 5 | 104 tests pass (health + accounts + importer + reference routes + student input + scoring + eligibility + analysis + golden student tests), on a separate test database |
+| Rules engine (scoring, eligibility, caching) | Phase 5 | Phase 5 | `backend/app/services/scoring.py` and `eligibility.py` are pure functions (no DB); `analysis.py` loads a student's data, calls them, and caches the result in `analysis`. `PUT /me/results` and `PUT /me/interest-answers` invalidate that cache unconditionally on every successful save, so `GET /me/analysis` never serves stale numbers |
 
 ## PRD Registry
 

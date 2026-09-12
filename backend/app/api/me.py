@@ -10,9 +10,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.user import User
+from app.schemas.analysis import AnalysisOut
 from app.schemas.interest_test import InterestAnswerIn, InterestAnswerOut
 from app.schemas.spm_result import SPMResultIn, SPMResultOut
 from app.schemas.user import UserPublic
+from app.services import analysis as analysis_service
 from app.services import interest_test as interest_test_service
 from app.services import results as results_service
 
@@ -76,3 +78,11 @@ def replace_my_interest_answers(
         interest_test_service.OptionQuestionMismatchError,
     ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/me/analysis", response_model=AnalysisOut)
+def read_my_analysis(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return analysis_service.get_analysis(db, current_user)

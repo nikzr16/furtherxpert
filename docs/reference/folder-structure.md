@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** a map of where every part of FurtherXpert lives.
 > - **Why:** so anyone can find the right file fast, and put new files in the right place.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), and Phase 4 (student input, backend only) are built. Items marked *(planned)* come in later phases.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), Phase 4 (student input, backend only), and Phase 5 (rules engine, backend only) are built. Items marked *(planned)* come in later phases.
 
 > **Type:** Reference | **Must stay current:** Yes -- update when structure, routes, schemas, or config change
 
@@ -53,7 +53,8 @@ furtherxpert/
 │   │       ├── 57ab2a90bfa6_add_reference_data_tables.py   creates the reference-data tables (Phase 3)
 │   │       ├── 6676e66b52e5_load_2026_2027_upu_snapshot.py loads the sesi 2026/2027 snapshot (Phase 3)
 │   │       ├── 23947a34f766_add_student_input_tables.py    creates the student-input tables (Phase 4)
-│   │       └── 1fa628967fac_seed_approved_interest_test.py loads the approved interest test (Phase 4)
+│   │       ├── 1fa628967fac_seed_approved_interest_test.py loads the approved interest test (Phase 4)
+│   │       └── 3916bef04fb3_add_analysis_table.py          creates the `analysis` cache table (Phase 5)
 │   ├── data/
 │   │   ├── interest_test.json      the 20 approved interest-test questions (Phase 4)
 │   │   └── upu/                    e-Panduan snapshots
@@ -64,7 +65,7 @@ furtherxpert/
 │   │   ├── api/health.py           GET /health
 │   │   ├── api/deps.py             shared dependency: finds the logged-in user from the access token
 │   │   ├── api/auth.py             POST /auth/register, /auth/login, /auth/refresh, /auth/logout
-│   │   ├── api/me.py               GET /me, DELETE /me, GET+PUT /me/results, PUT /me/interest-answers (Phase 4)
+│   │   ├── api/me.py               GET /me, DELETE /me, GET+PUT /me/results, PUT /me/interest-answers (Phase 4), GET /me/analysis (Phase 5)
 │   │   ├── api/reference.py        GET /subjects, /universities, /programs, /programs/{code} (Phase 3)
 │   │   ├── api/interest_test.py    GET /interest-test (Phase 4)
 │   │   ├── core/config.py          reads settings from .env
@@ -80,14 +81,19 @@ furtherxpert/
 │   │   ├── models/requirement.py   `general_requirements` + `program_requirements` tables (Phase 3)
 │   │   ├── models/spm_result.py    `spm_results` table (Phase 4)
 │   │   ├── models/interest_test.py `interest_questions` + `interest_options` + `interest_answers` tables (Phase 4)
+│   │   ├── models/analysis.py      `analysis` cache table (Phase 5)
 │   │   ├── schemas/user.py         request/response shapes for accounts
 │   │   ├── schemas/reference.py    request/response shapes for reference data (Phase 3)
 │   │   ├── schemas/spm_result.py   request/response shapes for SPM results (Phase 4)
 │   │   ├── schemas/interest_test.py request/response shapes for the interest test (Phase 4)
-│   │   ├── services/auth.py        sign-up and login rules (empty for scoring, eligibility, AI -- later phases)
+│   │   ├── schemas/analysis.py     response shape for GET /me/analysis (Phase 5)
+│   │   ├── services/auth.py        sign-up and login rules (empty for AI -- later phase)
 │   │   ├── services/reference.py   reads subjects, universities, and programs for the routes (Phase 3)
-│   │   ├── services/results.py     reads and upserts a student's SPM results (Phase 4)
-│   │   ├── services/interest_test.py reads the question list and replaces a student's answers (Phase 4)
+│   │   ├── services/results.py     reads and upserts a student's SPM results, invalidates the analysis cache (Phase 4, Phase 5)
+│   │   ├── services/interest_test.py reads the question list and replaces a student's answers, invalidates the analysis cache (Phase 4, Phase 5)
+│   │   ├── services/scoring.py     Chart scoring, Best Fit sort/filter -- pure functions, no DB (Phase 5)
+│   │   ├── services/eligibility.py UPU eligibility checker -- pure functions, no DB (Phase 5)
+│   │   ├── services/analysis.py    GET /me/analysis orchestration: loads DB data, calls scoring.py/eligibility.py, caches the result (Phase 5)
 │   │   └── importer/               e-Panduan importer (Phase 3)
 │   │       ├── epanduan.py         fetches e-Panduan and writes the session snapshot
 │   │       ├── subjects.py         hand-written Malay subject name -> subject code map
@@ -99,8 +105,14 @@ furtherxpert/
 │       ├── test_importer_epanduan.py   importer parser tests, on saved real e-Panduan pages (Phase 3)
 │       ├── test_reference_routes.py    /subjects, /universities, /programs, /programs/{code} route tests (Phase 3)
 │       ├── test_student_input.py   /me/results and interest-test route tests, incl. delete-account cascade (Phase 4)
+│       ├── test_scoring.py         unit tests for services/scoring.py -- pure functions, no DB (Phase 5)
+│       ├── test_eligibility.py     unit tests for services/eligibility.py, incl. the counts-once trap (Phase 5)
+│       ├── test_analysis.py        API tests for GET /me/analysis: caching, invalidation, cross-user isolation, category A/B, non-citizen (Phase 5)
 │       ├── fixtures/               saved real e-Panduan HTML pages used by the importer tests (Phase 3)
-│       └── golden/                 sample-student tests (planned, Phase 5)
+│       └── golden/                 6 sample-student golden tests, run against the real API + DB (Phase 5)
+│           ├── students.json           each student's SPM results and interest-test picks (hand-derived)
+│           ├── expected/*.json         each student's expected chart/Best Fit numbers, with a derivation note
+│           └── test_golden_students.py the test file: drives the real API, plus 3 eligibility spot-checks
 ├── client/
 │   ├── package.json, package-lock.json
 │   ├── Dockerfile, .dockerignore
@@ -123,7 +135,7 @@ furtherxpert/
 | `backend/app/main.py` | Creates the FastAPI app. Allows only `FRONTEND_ORIGIN` (CORS). Plugs in routers |
 | `backend/app/api/health.py` | `GET /health`: always HTTP 200, with `{"status":"ok","db":"ok"}` or `"db":"error"` |
 | `backend/app/api/auth.py` | Account routes that don't need a login: register, log in, refresh, log out |
-| `backend/app/api/me.py` | Account routes that need a login: view or delete the current account, save/read SPM results, save interest-test answers (Phase 4) |
+| `backend/app/api/me.py` | Account routes that need a login: view or delete the current account, save/read SPM results, save interest-test answers (Phase 4), read the computed charts/Best Fit/eligibility (`GET /me/analysis`, Phase 5) |
 | `backend/app/api/deps.py` | Shared dependency (`get_current_user`): reads the `Authorization` header, checks the access token, and looks up the matching row in `users`. Every `/me` route uses this -- never a user id typed in the request itself |
 | `backend/app/api/reference.py` | Reference-data routes, no login needed: `GET /subjects`, `GET /universities`, `GET /programs` (filter by `area`, `university`, `q`), `GET /programs/{code}` |
 | `backend/app/api/interest_test.py` | `GET /interest-test`: the 20 questions and their options, no login needed. Never returns which option maps to which interest area (Phase 4) |
@@ -140,14 +152,19 @@ furtherxpert/
 | `backend/app/models/requirement.py` | The `general_requirements` (syarat am) and `program_requirements` (syarat khas) tables: the rule tree (`rules`), the original Malay text (`text_ms`), and an `unparsed` flag, per session/program and per UPU category (A/B) |
 | `backend/app/models/spm_result.py` | The `spm_results` table: one row per subject a student has entered a grade for. `ON DELETE CASCADE` to `users`. Defines `SPM_GRADES`, the 10 allowed grades |
 | `backend/app/models/interest_test.py` | The `interest_questions`, `interest_options` (each tagged to an interest area, or untagged for "None of the above"), and `interest_answers` (`ON DELETE CASCADE` to `users`) tables |
+| `backend/app/models/analysis.py` | The `analysis` table: one cached row per user (`user_id` is the primary key, not a surrogate `id`), `ON DELETE CASCADE` to `users`. Holds the full `GET /me/analysis` response as JSONB plus its own `computed_at` (Phase 5) |
 | `backend/app/schemas/user.py` | Pydantic request/response shapes for register, login, and the current-account view |
 | `backend/app/schemas/reference.py` | Pydantic request/response shapes for the reference-data routes |
 | `backend/app/schemas/spm_result.py` | Pydantic request/response shapes for `GET`/`PUT /me/results`. Validates the grade is one of `SPM_GRADES` |
 | `backend/app/schemas/interest_test.py` | Pydantic request/response shapes for `GET /interest-test` and `PUT /me/interest-answers`. The public option shape carries no area id or name |
+| `backend/app/schemas/analysis.py` | Pydantic response shape for `GET /me/analysis`: both charts, Best Fit, Sweet spot, category, `computed_at` (Phase 5) |
 | `backend/app/services/auth.py` | Sign-up and login business rules: creates the account, checks the password, keeps login timing the same whether the email exists or not |
 | `backend/app/services/reference.py` | Reference-data reads: subjects, universities, and programs (with `area`/`university`/`q` filters), always from the most recently loaded session |
-| `backend/app/services/results.py` | SPM-results read and upsert: validates subject codes against the database, requires Bahasa Melayu (`BM`) and Sejarah (`SJ`) in every save, never deletes a subject the payload leaves out |
-| `backend/app/services/interest_test.py` | Interest-test reads (question list with options) and answer replacement: a retake deletes all of a student's previous answers and inserts the new set in one transaction |
+| `backend/app/services/results.py` | SPM-results read and upsert: validates subject codes against the database, requires Bahasa Melayu (`BM`) and Sejarah (`SJ`) in every save, never deletes a subject the payload leaves out. Also deletes the student's cached `analysis` row on every successful save (Phase 5) |
+| `backend/app/services/interest_test.py` | Interest-test reads (question list with options) and answer replacement: a retake deletes all of a student's previous answers and inserts the new set in one transaction. Also deletes the student's cached `analysis` row on every successful save (Phase 5) |
+| `backend/app/services/scoring.py` | **Pure functions, no DB session, no HTTP, no clock:** grade-to-percent, subject-group scores (Chart 1), interest-area scores (Chart 2), excel scores, top-3-with-tiebreak, Sweet spot, and Best Fit's program sort/filter (Phase 5) |
+| `backend/app/services/eligibility.py` | **Pure functions, no DB session, no HTTP, no clock:** the UPU eligibility checker. Merges syarat am + syarat khas into one rule tree and checks it with backtracking so each subject counts at most once across the whole tree (decision `0005`); returns a verdict (Eligible/Conditional/Not Eligible) with plain-English reasons (Phase 5) |
+| `backend/app/services/analysis.py` | `GET /me/analysis` orchestration: the one Phase 5 module that touches the DB and the clock. Loads a student's grades/answers/category and the current session's reference data, calls `scoring.py`/`eligibility.py`, builds Best Fit, caches the result in `analysis`. Raises `MissingGeneralRequirementsError` if the session has no syarat am row for the student's category (Phase 5) |
 | `backend/app/importer/epanduan.py` | Sequentially fetches e-Panduan's program lists and rule pages (1 request at a time, paused, retried with backoff), parses them with **selectolax** (decision `0002`), and writes a session snapshot |
 | `backend/app/importer/subjects.py` | Hand-written list mapping every Malay subject name (and old-syllabus name) seen on e-Panduan to one subject code. Raises `UnknownSubjectError` on an unmapped name, which stops the import |
 | `backend/app/importer/reference_data.py` | Hand-written university code -> name list (20 universities), and the PRD T1 interest-area mapping |
@@ -157,6 +174,7 @@ furtherxpert/
 | `backend/migrations/versions/6676e66b52e5_load_2026_2027_upu_snapshot.py` | Third migration: seeds the shared tables (universities, subjects, subject_groups, interest_areas) and loads `backend/data/upu/2026-2027.json` into the session-scoped tables. Re-running it replaces that session's rows only |
 | `backend/migrations/versions/23947a34f766_add_student_input_tables.py` | Fourth migration: creates `spm_results`, `interest_questions`, `interest_options`, and `interest_answers`. No rows loaded yet |
 | `backend/migrations/versions/1fa628967fac_seed_approved_interest_test.py` | Fifth migration: loads `backend/data/interest_test.json` (the 20 product owner-approved questions) into `interest_questions`/`interest_options`, tagging each option to its interest area. Re-running it fully replaces every question and option -- see decision `0004` for why it doesn't key the replace on the file's `version` field |
+| `backend/migrations/versions/3916bef04fb3_add_analysis_table.py` | Sixth migration: creates the `analysis` table (see **Database tables** below). No rows loaded -- it's filled the first time each student calls `GET /me/analysis` |
 
 ## Routes
 
@@ -177,6 +195,7 @@ furtherxpert/
 | `GET` | `/me/results` | Yes | The logged-in student's own saved SPM results |
 | `PUT` | `/me/results` | Yes | Upsert (update-or-insert) SPM results. Requires `BM` and `SJ` in the payload, rejects bad grades, duplicate subjects, or unknown subject codes |
 | `PUT` | `/me/interest-answers` | Yes | Replace the logged-in student's interest-test answers. A retake fully replaces the old set. Rejects duplicate question ids, unknown question/option ids, or an option that doesn't belong to its question |
+| `GET` | `/me/analysis` | Yes | The logged-in student's both charts, Likely to excel/love, Sweet spot, Best Fit (up to 3 programs per area, Eligible/Conditional only), and category (A/B). Cached until the student's results or answers change |
 
 > **Watch out:** every `/me` route only ever acts on the account tied to the access token. A student can never read or delete another student's account, results, or interest answers, even if they guess an id.
 
@@ -198,6 +217,7 @@ furtherxpert/
 | `interest_questions` | `id`, `n` (unique, 1-20, the question's number in the approved set), `text` | Added by migration `23947a34f766`, loaded by `1fa628967fac` (Phase 4). The 20 product owner-approved questions from `backend/data/interest_test.json` |
 | `interest_options` | `id`, `question_id` (FK `interest_questions`, `ON DELETE CASCADE`), `text`, `area_id` (FK `interest_areas`, nullable) | Added by migration `23947a34f766`, loaded by `1fa628967fac`. 4 area-tagged options per question, plus one "None of the above" option with `area_id` NULL |
 | `interest_answers` | `id`, `user_id` (FK `users`, `ON DELETE CASCADE`), `question_id` (FK `interest_questions`), `chosen_option_id` (FK `interest_options`) | Added by migration `23947a34f766` (Phase 4). One row per (`user_id`, `question_id`) the student has answered -- unique on that pair. `PUT /me/interest-answers` deletes and reinserts all of a student's rows on every save (a retake), so a partial answer set is allowed |
+| `analysis` | `user_id` (FK `users`, `ON DELETE CASCADE`, **primary key** -- one row per user, not a surrogate `id`), `result` (JSONB, the full `GET /me/analysis` response), `computed_at` (its own real `DateTime`, redundant with `result["computed_at"]` so a caller can order/filter without parsing JSON) | Added by migration `3916bef04fb3` (Phase 5). A cache: the first `GET /me/analysis` after a change computes and saves a row here; later `GET`s are served from it unchanged. `PUT /me/results` and `PUT /me/interest-answers` delete the student's row here on every successful save (decision `0006`), so it never goes stale |
 
 ## Client
 

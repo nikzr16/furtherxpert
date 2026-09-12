@@ -1,0 +1,258 @@
+"""Golden-student tests for `GET /me/analysis` (Phase 5 stage 3; PRD T1, T2).
+
+Six hand-derived sample students, registered and driven through the real API
+(`PUT /me/results`, `PUT /me/interest-answers`, `GET /me/analysis`) against
+the real, migrated test database (see `tests/conftest.py`) -- no mocking of
+`scoring.py` / `eligibility.py` / `analysis.py`. Input data lives in
+`tests/golden/students.json`; expected chart output lives in
+`tests/golden/expected/<name>.json`. Every expected number in the `expected/`
+files was independently re-derived from the same grades/picks using the
+formulas documented in each file's `_derivation` field -- see those files
+for two arithmetic corrections found in the original hand-derived draft
+(Amir/Mei Ling's LANGUAGES+HUMANITIES subject-group scores, and Rahman's
+HUMANITIES subject-group score / Education & Humanities excel score).
+
+A separate section (bottom of this file) spot-checks 3 real UPU programs'
+eligibility verdicts by calling `evaluate_eligibility` directly with grades
++ rules loaded from the live `GET /programs/{code}` endpoint, rather than
+relying on Best Fit's top-3-by-name truncation to surface them.
+"""
+
+import json
+from pathlib import Path
+
+from app.services.analysis import BUMIPUTERA_RACES
+from app.services.eligibility import evaluate_eligibility
+
+GOLDEN_DIR = Path(__file__).parent
+STUDENTS = json.loads((GOLDEN_DIR / "students.json").read_text(encoding="utf-8"))["students"]
+STUDENTS_BY_NAME = {s["name"]: s for s in STUDENTS}
+
+
+def _auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _register_and_login(client, make_register_payload, student: dict):
+    payload = make_register_payload(
+        is_citizen=student["is_citizen"],
+        race=student["race"],
+        spm_year=student["spm_year"],
+    )
+    register_response = client.post("/auth/register", json=payload)
+    assert register_response.status_code == 201, register_response.text
+    login_response = client.post("/auth/login", json={"email": payload["email"], "password": payload["password"]})
+    assert login_response.status_code == 200, login_response.text
+    return login_response.json()["access_token"]
+
+
+def _resolve_interest_picks(client, picks: list[dict]) -> list[dict]:
+    """Turn `[{"question_text": ..., "option_text": ...}, ...]` into
+    `[{"question_id": ..., "option_id": ...}, ...]` by matching the exact
+    `text` fields returned by the real, seeded `GET /interest-test`.
+    """
+    questions = client.get("/interest-test").json()
+    by_text = {q["text"]: q for q in questions}
+    resolved = []
+    for pick in picks:
+        question = by_text[pick["question_text"]]
+        option = next(opt for opt in question["options"] if opt["text"] == pick["option_text"])
+        resolved.append({"question_id": question["id"], "option_id": option["id"]})
+    return resolved
+
+
+def _run_student(client, make_register_payload, student: dict) -> dict:
+    """Register, PUT results, optionally PUT interest answers, and return
+    the `GET /me/analysis` body for one golden student.
+    """
+    token = _register_and_login(client, make_register_payload, student)
+
+    put_results_resp = client.put("/me/results", json=student["results"], headers=_auth(token))
+    assert put_results_resp.status_code == 200, put_results_resp.text
+
+    if student["call_interest_answers"]:
+        resolved = _resolve_interest_picks(client, student["interest_picks"])
+        put_answers_resp = client.put("/me/interest-answers", json=resolved, headers=_auth(token))
+        assert put_answers_resp.status_code == 200, put_answers_resp.text
+
+    analysis_resp = client.get("/me/analysis", headers=_auth(token))
+    assert analysis_resp.status_code == 200, analysis_resp.text
+    return analysis_resp.json()
+
+
+def _group_score(body: dict, group_code: str) -> float:
+    return next(g["score"] for g in body["subject_groups"] if g["group"] == group_code)
+
+
+def _group_present(body: dict, group_code: str) -> bool:
+    return any(g["group"] == group_code for g in body["subject_groups"])
+
+
+def _area_score(body: dict, area_name: str) -> float:
+    return next(a["score"] for a in body["interest_areas"] if a["area"] == area_name)
+
+
+def _assert_matches_expected(body: dict, expected: dict) -> None:
+    # --- subject_groups: name-keyed lookups, plus explicit absence checks ---
+    for group_code, score in expected["subject_groups"].items():
+        assert _group_score(body, group_code) == score, group_code
+    for absent_group in expected.get("subject_groups_absent", []):
+        assert not _group_present(body, absent_group), absent_group
+    assert len(body["subject_groups"]) == len(expected["subject_groups"])
+
+    # --- interest_areas: name-keyed lookups, all 9 always present ---
+    assert len(body["interest_areas"]) == 9
+    for area_name, score in expected["interest_areas"].items():
+        assert _area_score(body, area_name) == score, area_name
+
+    # --- likely_to_excel / likely_to_love / sweet_spots: exact ordered lists ---
+    assert [[e["area"], e["score"]] for e in body["likely_to_excel"]] == expected["likely_to_excel"]
+    assert [[e["area"], e["score"]] for e in body["likely_to_love"]] == expected["likely_to_love"]
+    for absent_area in expected.get("likely_to_excel_absent", []):
+        assert absent_area not in [e["area"] for e in body["likely_to_excel"]], absent_area
+    assert body["sweet_spots"] == expected["sweet_spots"]
+
+    assert body["category"] == expected["category"]
+
+
+def _load_expected(name: str) -> dict:
+    return json.loads((GOLDEN_DIR / "expected" / f"{name}.json").read_text(encoding="utf-8"))
+
+
+# --- Amir: Melayu, citizen, spm_year 2025 (category A) ------------------------
+
+
+def test_amir(client, make_register_payload):
+    student = STUDENTS_BY_NAME["amir"]
+    expected = _load_expected("amir")
+
+    body = _run_student(client, make_register_payload, student)
+    _assert_matches_expected(body, expected)
+
+    best_fit_areas = {area["area"] for area in body["best_fit"]}
+    assert best_fit_areas == set(expected["best_fit_areas"])
+
+
+# --- Mei Ling: identical results/answers to Amir, only race differs -----------
+
+
+def test_mei_ling_matches_amir_because_race_never_affects_scoring(client, make_register_payload):
+    amir_body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["amir"])
+    mei_ling_body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["mei_ling"])
+    expected = _load_expected("mei_ling")
+
+    _assert_matches_expected(mei_ling_body, expected)
+
+    # Direct equality against Amir's own (freshly computed, same run) body --
+    # race must never affect the pure scoring/chart functions.
+    for field in ("subject_groups", "interest_areas", "likely_to_excel", "likely_to_love", "sweet_spots", "category"):
+        assert mei_ling_body[field] == amir_body[field], field
+
+
+# --- Priya: India, citizen, spm_year 2020 (category B) ------------------------
+
+
+def test_priya(client, make_register_payload):
+    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["priya"])
+    _assert_matches_expected(body, _load_expected("priya"))
+
+
+# --- Rahman: Anak Negeri Sabah, citizen, spm_year 2025 (category A), no interest test ---
+
+
+def test_rahman(client, make_register_payload):
+    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["rahman"])
+    _assert_matches_expected(body, _load_expected("rahman"))
+
+
+# --- Aisyah: Melayu, citizen, spm_year 2025 (category A), no science subjects ---
+
+
+def test_aisyah(client, make_register_payload):
+    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["aisyah"])
+    _assert_matches_expected(body, _load_expected("aisyah"))
+
+
+# --- Daniel: non-citizen, spm_year 2025 (category A), good grades -------------
+
+
+def test_daniel(client, make_register_payload):
+    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["daniel"])
+    expected = _load_expected("daniel")
+    _assert_matches_expected(body, expected)
+
+    assert expected["best_fit_all_programs_empty"] is True
+    assert body["best_fit"] != []
+    for area in body["best_fit"]:
+        assert area["programs"] == []
+
+
+# --- Eligibility spot-checks: evaluate_eligibility called directly ------------
+#
+# These do not rely on Best Fit's top-3-by-name truncation to surface a
+# program -- a program can be genuinely Eligible for a student yet not make
+# an area's top-3-by-name cut if other eligible programs sort earlier
+# alphabetically. Instead: fetch the program's `requirements` /
+# `general_requirements` via `GET /programs/{code}`, pick the category-A row,
+# and call `evaluate_eligibility` directly.
+
+
+def _category_a_rules(program: dict) -> tuple[dict, dict]:
+    general_rules = next(r["rules"] for r in program["general_requirements"] if r["category"] == "A")
+    program_rules = next(r["rules"] for r in program["requirements"] if r["category"] == "A")
+    return general_rules, program_rules
+
+
+def _grades_of(name: str) -> dict[str, str]:
+    return {row["subject_code"]: row["grade"] for row in STUDENTS_BY_NAME[name]["results"]}
+
+
+def test_eligibility_spot_checks(client):
+    amir_grades = _grades_of("amir")
+    mei_ling_grades = _grades_of("mei_ling")
+    rahman_grades = _grades_of("rahman")
+
+    # --- 1. UE4481001: bumiputera_only=true, category A syarat khas needs
+    # BI>=C, MT>=C, one_of(...)>=C count 1, plus 2 uncounted@C, and the
+    # general syarat am's own BM>=C / SJ>=E / 2 uncounted@C. ---------------
+    ue4481001 = client.get("/programs/UE4481001").json()
+    general_rules, program_rules = _category_a_rules(ue4481001)
+    assert program_rules["bumiputera_only"] is True
+
+    amir_verdict = evaluate_eligibility(
+        amir_grades, general_rules, program_rules, is_citizen=True, is_bumiputera="Melayu" in BUMIPUTERA_RACES
+    )
+    assert amir_verdict == {"verdict": "Eligible", "reasons": []}
+
+    mei_ling_verdict = evaluate_eligibility(
+        mei_ling_grades, general_rules, program_rules, is_citizen=True, is_bumiputera="Cina" in BUMIPUTERA_RACES
+    )
+    assert mei_ling_verdict == {
+        "verdict": "Not Eligible",
+        "reasons": ["This program is limited to Bumiputera students"],
+    }
+
+    # --- 2. UA4481001 (non-UiTM, non-Bumiputera-only equivalent): Mei Ling
+    # is Eligible here even though she's Not Eligible for UE4481001. -------
+    ua4481001 = client.get("/programs/UA4481001").json()
+    general_rules_2, program_rules_2 = _category_a_rules(ua4481001)
+
+    mei_ling_verdict_2 = evaluate_eligibility(
+        mei_ling_grades, general_rules_2, program_rules_2, is_citizen=True, is_bumiputera="Cina" in BUMIPUTERA_RACES
+    )
+    assert mei_ling_verdict_2 == {"verdict": "Eligible", "reasons": []}
+
+    # --- 3. UE4213001 (UiTM, no syarat khas grade requirements, interview
+    # required): Rahman is Conditional (grade tree passes via the general
+    # syarat am alone; interview: true forces Conditional). ----------------
+    ue4213001 = client.get("/programs/UE4213001").json()
+    general_rules_3, program_rules_3 = _category_a_rules(ue4213001)
+
+    rahman_verdict = evaluate_eligibility(
+        rahman_grades,
+        general_rules_3,
+        program_rules_3,
+        is_citizen=True,
+        is_bumiputera="Anak Negeri Sabah" in BUMIPUTERA_RACES,
+    )
+    assert rahman_verdict == {"verdict": "Conditional", "reasons": ["Requires interview/test"]}

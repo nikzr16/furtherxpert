@@ -1,0 +1,35 @@
+{
+  "_derivation": "Grade -> points (A+=9..G=0) -> percent = points/9*100, full precision. subject_groups[G] = mean percent of the subjects the student has in group G (a group with none of its subjects taken is omitted). excel_scores[Area] = mean of subject_groups[g] for g in that area's group list, over only the groups the student actually has (area omitted if none). love_scores[Area] = picks/max_picks*100 (max_picks per app/importer + interest_test.json: Science & Technology max=9). Amir picked all 9 Science & Technology-tagged options and nothing else, so love=100.0 for Science & Technology and 0.0 for the other 8 areas. CORRECTION vs the orchestrator's hand-derived draft: the draft flagged HUMANITIES as possibly wrong (77.8 vs 88.9) and asked us to verify -- confirmed: HUMANITIES (SJ grade A = 8/9*100 = 88.888..%, sole subject) is 88.9, not 77.8. In addition, an UNFLAGGED second slip was found: the draft's LANGUAGES value (88.9) was actually HUMANITIES's correct number copy-pasted into the wrong row; LANGUAGES's real value is mean(BM A+ = 100.0%, BI A = 88.888..%) = 94.444..% = 94.4. This is confirmed self-consistent: the draft's own excel_top3 for Media & Communications (94.4, = LANGUAGES alone since Amir has no ARTS subjects) already used the correct 94.4 LANGUAGES figure, it just never made it into the subject_groups table. Both corrections applied below.",
+  "subject_groups": {
+    "COMMERCE": 33.3,
+    "HUMANITIES": 88.9,
+    "LANGUAGES": 94.4,
+    "MATHEMATICS": 100.0,
+    "SCIENCES": 92.6,
+    "TECHNICAL_ICT": 100.0
+  },
+  "interest_areas": {
+    "Science & Technology": 100.0,
+    "Business & Management": 0.0,
+    "Law & Governance": 0.0,
+    "Healthcare & Social Services": 0.0,
+    "Arts & Design": 0.0,
+    "Education & Humanities": 0.0,
+    "Hospitality & Tourism": 0.0,
+    "Agriculture & Environment": 0.0,
+    "Media & Communications": 0.0
+  },
+  "likely_to_excel": [
+    ["Science & Technology", 97.5],
+    ["Media & Communications", 94.4],
+    ["Agriculture & Environment", 92.6]
+  ],
+  "likely_to_love": [
+    ["Science & Technology", 100.0],
+    ["Media & Communications", 0.0],
+    ["Agriculture & Environment", 0.0]
+  ],
+  "sweet_spots": ["Science & Technology", "Media & Communications", "Agriculture & Environment"],
+  "category": "A",
+  "best_fit_areas": ["Science & Technology", "Media & Communications", "Agriculture & Environment"]
+}

@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** how the app behaves **today**: what happens, step by step, when a student uses it.
 > - **Why:** when you change code, this doc is the spec for current behaviour. If code and this doc disagree, fix one of them.
-> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), and student input (saving SPM results, taking or retaking the interest test, reading your own data back). Each new phase adds its flow here.
+> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back), and analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes). Each new phase adds its flow here.
 
 > **Type:** Workflow | **Must stay current:** Yes -- update when behavior changes
 
@@ -20,7 +20,7 @@ Add one "Flow" section per feature as phases ship.
 
 ## Purpose
 
-Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2), **reference data** (Phase 3), and **student input** (Phase 4). Only the backend exists yet. There are no screens until Phase 6, so flows start from API requests -- except the yearly import below, which a developer runs by hand.
+Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2), **reference data** (Phase 3), **student input** (Phase 4), and **analysis** (Phase 5). Only the backend exists yet. There are no screens until Phase 6, so flows start from API requests -- except the yearly import below, which a developer runs by hand.
 
 ## Trigger
 
@@ -170,6 +170,43 @@ Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school l
 
 > **Watch out:** `spm_results` and `interest_answers` are keyed to a login, not a name or email. So even the student who "owns" the data can only reach it through their own access token -- there's no route that takes another student's id.
 
+## Flow 4: Analysis
+
+Analysis turns a student's saved SPM (**Sijil Pelajaran Malaysia**) results and interest-test answers into the 2 charts, the **Best Fit** list (up to 3 matching programs per area), and an eligibility verdict for every program in the student's UPU category. It's personal data, so like Flow 3 it needs a login, and only ever touches the logged-in student's own rows.
+
+### 1. Get your charts, Best Fit, and eligibility
+
+**Input:** `GET /me/analysis`.
+**Actions:**
+1. Look for an existing cached row for this student in the `analysis` table. If one exists, return it as-is -- skip every step below.
+2. If there's no cached row, compute fresh:
+   a. Load the student's saved `{subject_code: grade}` pairs, and the subject-group each subject belongs to.
+   b. Work out **category A or B**: compare the student's `spm_year` to the most recently loaded session's `latest_spm_year`. Same year = category A (this year's SPM leavers); older = category B.
+   c. Load the 9 interest areas, and how many of the interest test's questions can award each area a point (its "max picks").
+   d. Count the student's own picks per area from their saved interest-test answers ("None of the above" answers don't count toward any area).
+   e. Load **syarat am** (general_requirements), the entry rules that apply to every program in this session + category.
+   f. Load every program in this session + category, with its own **syarat khas** (program_requirements), and run the eligibility check (Flow 4 step 2's rules) for each one against the student's grades, citizenship, and race.
+   g. Compute **Chart 1** (subject-group scores: the mean grade-percent of the subjects the student took in that group; a group with none of its subjects taken is left out entirely, never shown as 0), and **Chart 2** (interest-area scores: picks / max picks, as a percent; every one of the 9 areas is always shown, even at 0%).
+   h. Compute **Likely to excel** (top 3 areas by Chart 1's related subject groups; an area is left out if the student has none of its subject groups) and **Likely to love** (top 3 areas by Chart 2's score). Ties are broken by the other list's score, then by area name.
+   i. **Sweet spot:** any area that appears in both top-3 lists.
+   j. **Best Fit:** for every area that appears in *either* top-3 list (the union, not excel-only), show up to 3 of that area's programs -- Eligible ones first, then by name, and only Eligible or Conditional programs, never Not Eligible.
+   k. Save the whole result as one row in `analysis` (replacing nothing, since there's no existing row at this point), and return it.
+
+**Output:** `200` with subject-group scores, interest-area scores, Likely to excel, Likely to love, Sweet spot, Best Fit, the category (A/B) used, and `computed_at` (when it was worked out).
+**On failure:** if the current session has no `general_requirements` row for the student's category (a data problem, not a student mistake -- see the Error States table below), the request fails with a `500` server error rather than a normal eligibility result.
+
+> **Watch out:** a non-citizen student still gets both full charts (PRD T2: "the charts are still shown") -- only Best Fit's program lists come back empty for them, since a non-citizen can never be Eligible or Conditional for any program (a hard stop, checked first). The same "still show charts" rule applies to a Bumiputera-only program mismatch: it only empties that one program out of Best Fit, not the whole response.
+
+> **Watch out:** the eligibility verdict order is fixed. 1) not a citizen -> Not Eligible. 2) the program is Bumiputera-only and the student isn't -> Not Eligible. 3) the combined syarat am + syarat khas grade rules aren't met -> Not Eligible, with plain-English reasons (for example "Needs C in Matematik — you have D"). 4) an interview/test is needed, or a rule can't be checked automatically (medical, colour-blindness, age) -> Conditional, with reasons. 5) otherwise -> Eligible. Each of the student's subjects can satisfy at most one rule clause across syarat am and syarat khas combined -- see decision `0005` for how that's checked.
+
+### 2. The cache, and when it goes stale
+
+**How it works:** `analysis` holds at most one row per student. The first `GET /me/analysis` after a change computes fresh and saves it; every `GET` after that, until something changes, is served straight from that saved row -- same `computed_at` each time, no recompute.
+
+**Cache invalidation:** both `PUT /me/results` (Flow 3) and `PUT /me/interest-answers` (Flow 3) delete the student's cached `analysis` row as part of their own save, every time they succeed -- there's no check for whether the save actually changed anything. So the very next `GET /me/analysis` after either save always recomputes fresh; it can never return numbers from before that save. See decision `0006` for why this is unconditional rather than diffed.
+
+> **Watch out:** deleting a student's account (Flow 1's `DELETE /me`) removes their `analysis` row too, the same `ON DELETE CASCADE` way as `spm_results` and `interest_answers`.
+
 ## Error States
 
 | Error | Cause | Handling |
@@ -182,6 +219,7 @@ Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school l
 | `404` Program not found | `GET /programs/{code}` with a code not in the current session | The client shows a "not found" message |
 | `400` Bad SPM result save | `PUT /me/results` with a bad grade, a duplicate subject, a missing `BM`/`SJ` row, or an unknown subject code | The client shows the field error and doesn't save |
 | `400` Bad interest-answer save | `PUT /me/interest-answers` with a duplicate question id, an unknown question/option id, or an option that doesn't match its question | The client shows the field error and doesn't save |
+| `500` Analysis can't be computed | `GET /me/analysis` when the current session has no `general_requirements` row for the student's category -- a reference-data gap, not something the student did wrong | Not caught as a friendly error yet: it surfaces as a generic server error. The client should show a generic "something went wrong, try again later" message. A developer should treat this as a sign the session's data load is incomplete |
 
 ## Defaults
 
@@ -206,6 +244,8 @@ Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school l
 - The importer only fetches one page at a time -- it never runs requests to e-Panduan in parallel.
 - `PUT /me/results` is **upsert-only**: it never deletes a subject the payload leaves out. To remove a saved subject, a future route would need to add that on purpose.
 - `PUT /me/interest-answers` is a **full replace** every time: it always clears the student's previous answers first, then saves the new payload as the whole new set.
+- `PUT /me/results` and `PUT /me/interest-answers` both delete the student's cached `analysis` row on every successful save, unconditionally -- there's no check for whether the save actually changed anything (decision `0006`).
+- `GET /me/analysis` only ever computes for, caches, and returns the logged-in student's own data -- the same access-token scoping as every other `/me` route.
 
 ## Related Documents
 

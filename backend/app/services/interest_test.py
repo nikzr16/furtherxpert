@@ -20,6 +20,7 @@ import uuid
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session as DbSession, selectinload
 
+from app.models.analysis import Analysis
 from app.models.interest_test import InterestAnswer, InterestOption, InterestQuestion
 from app.schemas.interest_test import InterestAnswerIn
 
@@ -94,6 +95,11 @@ def replace_answers(db: DbSession, user_id: uuid.UUID, items: list[InterestAnswe
     db.execute(delete(InterestAnswer).where(InterestAnswer.user_id == user_id))
     for item in items:
         db.add(InterestAnswer(user_id=user_id, question_id=item.question_id, chosen_option_id=item.option_id))
+
+    # Invalidate the cached analysis (Phase 5): a changed answer set means
+    # the cached scores/Best Fit are stale, so the next `GET /me/analysis`
+    # must recompute (PRD T5).
+    db.execute(delete(Analysis).where(Analysis.user_id == user_id))
     db.commit()
 
     return [{"question_id": item.question_id, "option_id": item.option_id} for item in items]

@@ -1,5 +1,6 @@
 """Import every model so `Base.metadata` (and Alembic autogenerate) sees them."""
 
+from app.models.analysis import Analysis  # noqa: F401
 from app.models.interest_area import InterestArea  # noqa: F401
 from app.models.interest_test import InterestAnswer, InterestOption, InterestQuestion  # noqa: F401
 from app.models.program import Campus, Program  # noqa: F401

@@ -12,9 +12,10 @@ validates subject codes against the DB (unknown codes are a 400, PRD T6/T2).
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session as DbSession
 
+from app.models.analysis import Analysis
 from app.models.spm_result import SPMResult
 from app.models.subject import Subject
 from app.schemas.spm_result import SPMResultIn
@@ -90,6 +91,11 @@ def upsert_results(db: DbSession, user_id: uuid.UUID, items: list[SPMResultIn]) 
             db.add(SPMResult(user_id=user_id, subject_id=subject.id, grade=item.grade))
         else:
             row.grade = item.grade
+
+    # Invalidate the cached analysis (Phase 5): a changed result set means
+    # the cached scores/Best Fit are stale, so the next `GET /me/analysis`
+    # must recompute (PRD T5).
+    db.execute(delete(Analysis).where(Analysis.user_id == user_id))
     db.commit()
 
     return list_results(db, user_id)

@@ -1,0 +1,31 @@
+{
+  "_derivation": "Grade -> points -> percent as in amir.json. ARTS = mean(PSV A=88.889%, BU A-=77.778%, RBG B+=66.667%) = 233.333/3 = 77.778 -> 77.8. HUMANITIES = SJ C alone = 33.333 -> 33.3. LANGUAGES = mean(BM B=55.556%, BI B=55.556%) = 55.6. Arts & Design excel = ARTS alone = 77.8. Media & Communications excel = mean(LANGUAGES=55.6, ARTS=77.8) = 66.7. Hospitality & Tourism excel = LANGUAGES alone (Priya has no COMMERCE subjects) = 55.6. love: Arts & Design picks=4/9=44.4, Media & Communications picks=2/9=22.2, all other areas 0. All numbers here match the orchestrator's hand-derived draft exactly -- no discrepancy found for Priya.",
+  "subject_groups": {
+    "ARTS": 77.8,
+    "HUMANITIES": 33.3,
+    "LANGUAGES": 55.6
+  },
+  "interest_areas": {
+    "Science & Technology": 0.0,
+    "Business & Management": 0.0,
+    "Law & Governance": 0.0,
+    "Healthcare & Social Services": 0.0,
+    "Arts & Design": 44.4,
+    "Education & Humanities": 0.0,
+    "Hospitality & Tourism": 0.0,
+    "Agriculture & Environment": 0.0,
+    "Media & Communications": 22.2
+  },
+  "likely_to_excel": [
+    ["Arts & Design", 77.8],
+    ["Media & Communications", 66.7],
+    ["Hospitality & Tourism", 55.6]
+  ],
+  "likely_to_love": [
+    ["Arts & Design", 44.4],
+    ["Media & Communications", 22.2],
+    ["Hospitality & Tourism", 0.0]
+  ],
+  "sweet_spots": ["Arts & Design", "Media & Communications", "Hospitality & Tourism"],
+  "category": "B"
+}

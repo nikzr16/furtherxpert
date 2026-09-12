@@ -1,0 +1,34 @@
+{
+  "_derivation": "Grade -> points -> percent as in amir.json. COMMERCE = mean(EK B=55.556%, PP B=55.556%) = 55.6. HUMANITIES = mean(SJ A-=77.778%, GG A=88.889%) = 83.333 -> 83.3. LANGUAGES = mean(BM A=88.889%, BI A-=77.778%) = 83.333 -> 83.3. MATHEMATICS = MT B+ alone = 66.7. No SCIENCES subjects at all, so the SCIENCES key is absent from subject_groups entirely. Education & Humanities and Law & Governance excel both = mean(LANGUAGES=83.333, HUMANITIES=83.333) = 83.3 (they always tie -- both areas map to exactly [LANGUAGES, HUMANITIES]). Media & Communications excel = LANGUAGES alone (no ARTS subjects) = 83.333 -> 83.3, which happens to tie the other two numerically; tiebreak is love score (all 0 here) then area name ascending, giving order Education & Humanities, Law & Governance, Media & Communications for excel_top3. Healthcare & Social Services excel is impossible to compute (its only listed group is SCIENCES, which Aisyah has none of) so it is entirely absent from excel_scores/likely_to_excel -- this is the deliberate 'Healthcare excluded from excel' exercise. love: all 9 Healthcare & Social Services-tagged options picked -> 100.0; every other area 0.0. love_top3 = Healthcare & Social Services (100.0) plus, among the 0.0-love areas, the two with the highest excel tiebreak score (the same three-way 83.3 tie among Education & Humanities / Law & Governance / Media & Communications, broken alphabetically) -> Education & Humanities, Law & Governance. This is the deliberate 'excluded from excel but still shows in love' exercise: Healthcare & Social Services appears in likely_to_love despite being absent from likely_to_excel. sweet_spots = intersection of excel_top3 {Education & Humanities, Law & Governance, Media & Communications} and love_top3 {Healthcare & Social Services, Education & Humanities, Law & Governance}, in excel_top3 order = [Education & Humanities, Law & Governance] (Healthcare & Social Services is NOT a sweet spot since it never appears in excel_top3, even though it is #1 in love). All numbers here match the orchestrator's hand-derived draft exactly -- no discrepancy found for Aisyah.",
+  "subject_groups": {
+    "COMMERCE": 55.6,
+    "HUMANITIES": 83.3,
+    "LANGUAGES": 83.3,
+    "MATHEMATICS": 66.7
+  },
+  "subject_groups_absent": ["SCIENCES"],
+  "interest_areas": {
+    "Science & Technology": 0.0,
+    "Business & Management": 0.0,
+    "Law & Governance": 0.0,
+    "Healthcare & Social Services": 100.0,
+    "Arts & Design": 0.0,
+    "Education & Humanities": 0.0,
+    "Hospitality & Tourism": 0.0,
+    "Agriculture & Environment": 0.0,
+    "Media & Communications": 0.0
+  },
+  "likely_to_excel": [
+    ["Education & Humanities", 83.3],
+    ["Law & Governance", 83.3],
+    ["Media & Communications", 83.3]
+  ],
+  "likely_to_excel_absent": ["Healthcare & Social Services"],
+  "likely_to_love": [
+    ["Healthcare & Social Services", 100.0],
+    ["Education & Humanities", 0.0],
+    ["Law & Governance", 0.0]
+  ],
+  "sweet_spots": ["Education & Humanities", "Law & Governance"],
+  "category": "A"
+}

@@ -1,0 +1,33 @@
+{
+  "_derivation": "Grade -> points -> percent as in amir.json. COMMERCE = EK C alone = 33.3. HUMANITIES = mean(SJ D=22.222%, GG C=33.333%, PI D=22.222%) = 77.778/3 = 25.926 -> 25.9. LANGUAGES = mean(BM C=33.333%, BI C=33.333%) = 33.3. MATHEMATICS = mean(MT D=22.222%, MTT D=22.222%) = 22.2. TECHNICAL_ICT = SK D alone = 22.2. No SCIENCES, no ARTS (no subjects taken in those groups). CORRECTION vs the orchestrator's hand-derived draft (unflagged): HUMANITIES was stated as 27.8; the correct value from the grades given is 25.9 (see arithmetic above -- 2 D's and 1 C average to 25.926%, not a value consistent with 27.8 under any grade-rounding order). This cascades into Education & Humanities' excel score: mean(LANGUAGES=33.333, HUMANITIES=25.926) = 29.630 -> 29.6, not the draft's 30.6. The ranking/order of excel_top3, love_top3, and sweet_spots is unaffected by this correction (Education & Humanities still ranks 3rd, below Hospitality & Tourism and Media & Communications which are both exactly 33.3). No interest-answers call at all for Rahman (exercises the 'no interest answers yet' state), so every interest_areas score is 0.0 and love ranking falls through entirely to the excel-score tiebreak.",
+  "subject_groups": {
+    "COMMERCE": 33.3,
+    "HUMANITIES": 25.9,
+    "LANGUAGES": 33.3,
+    "MATHEMATICS": 22.2,
+    "TECHNICAL_ICT": 22.2
+  },
+  "interest_areas": {
+    "Science & Technology": 0.0,
+    "Business & Management": 0.0,
+    "Law & Governance": 0.0,
+    "Healthcare & Social Services": 0.0,
+    "Arts & Design": 0.0,
+    "Education & Humanities": 0.0,
+    "Hospitality & Tourism": 0.0,
+    "Agriculture & Environment": 0.0,
+    "Media & Communications": 0.0
+  },
+  "likely_to_excel": [
+    ["Hospitality & Tourism", 33.3],
+    ["Media & Communications", 33.3],
+    ["Education & Humanities", 29.6]
+  ],
+  "likely_to_love": [
+    ["Hospitality & Tourism", 0.0],
+    ["Media & Communications", 0.0],
+    ["Education & Humanities", 0.0]
+  ],
+  "sweet_spots": ["Hospitality & Tourism", "Media & Communications", "Education & Humanities"],
+  "category": "A"
+}

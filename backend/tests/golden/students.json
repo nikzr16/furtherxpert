@@ -1,0 +1,156 @@
+{
+  "_purpose": "Phase 5 stage 3 golden fixtures: 6 sample students exercising GET /me/analysis end to end (PRD T1, T2, T5) plus 3 eligibility spot-checks (see test_golden_students.py). Each student's `results` and `interest_picks` are hand-derived from the real seeded data (backend/app/importer/subjects.py, backend/data/interest_test.json, backend/data/upu/2026-2027.json).",
+  "students": [
+    {
+      "name": "amir",
+      "is_citizen": true,
+      "race": "Melayu",
+      "spm_year": 2025,
+      "results": [
+        {"subject_code": "BM", "grade": "A+"},
+        {"subject_code": "SJ", "grade": "A"},
+        {"subject_code": "BI", "grade": "A"},
+        {"subject_code": "MT", "grade": "A+"},
+        {"subject_code": "MTT", "grade": "A+"},
+        {"subject_code": "FZ", "grade": "A+"},
+        {"subject_code": "KM", "grade": "A"},
+        {"subject_code": "BL", "grade": "A"},
+        {"subject_code": "SK", "grade": "A+"},
+        {"subject_code": "EK", "grade": "C"}
+      ],
+      "call_interest_answers": true,
+      "interest_picks": [
+        {"question_text": "Which school activity would you pick?", "option_text": "Build a robot or simple app"},
+        {"question_text": "Which topic sounds most interesting?", "option_text": "How computers solve problems"},
+        {"question_text": "Which job would you try for a day?", "option_text": "Engineer at a factory"},
+        {"question_text": "What kind of problem do you enjoy?", "option_text": "Fixing a broken gadget"},
+        {"question_text": "Which club would you join?", "option_text": "Robotics or coding"},
+        {"question_text": "What would you like to learn more about?", "option_text": "How chemicals react"},
+        {"question_text": "With RM1,000 for a project, you'd…", "option_text": "Buy parts to build a gadget"},
+        {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "Science or Computer Science"},
+        {"question_text": "Your dream workplace is…", "option_text": "A lab or tech company"}
+      ]
+    },
+    {
+      "name": "mei_ling",
+      "is_citizen": true,
+      "race": "Cina",
+      "spm_year": 2025,
+      "results": [
+        {"subject_code": "BM", "grade": "A+"},
+        {"subject_code": "SJ", "grade": "A"},
+        {"subject_code": "BI", "grade": "A"},
+        {"subject_code": "MT", "grade": "A+"},
+        {"subject_code": "MTT", "grade": "A+"},
+        {"subject_code": "FZ", "grade": "A+"},
+        {"subject_code": "KM", "grade": "A"},
+        {"subject_code": "BL", "grade": "A"},
+        {"subject_code": "SK", "grade": "A+"},
+        {"subject_code": "EK", "grade": "C"}
+      ],
+      "call_interest_answers": true,
+      "interest_picks": [
+        {"question_text": "Which school activity would you pick?", "option_text": "Build a robot or simple app"},
+        {"question_text": "Which topic sounds most interesting?", "option_text": "How computers solve problems"},
+        {"question_text": "Which job would you try for a day?", "option_text": "Engineer at a factory"},
+        {"question_text": "What kind of problem do you enjoy?", "option_text": "Fixing a broken gadget"},
+        {"question_text": "Which club would you join?", "option_text": "Robotics or coding"},
+        {"question_text": "What would you like to learn more about?", "option_text": "How chemicals react"},
+        {"question_text": "With RM1,000 for a project, you'd…", "option_text": "Buy parts to build a gadget"},
+        {"question_text": "Which subject do you enjoy (even if it's not your best)?", "option_text": "Science or Computer Science"},
+        {"question_text": "Your dream workplace is…", "option_text": "A lab or tech company"}
+      ]
+    },
+    {
+      "name": "priya",
+      "is_citizen": true,
+      "race": "India",
+      "spm_year": 2020,
+      "results": [
+        {"subject_code": "BM", "grade": "B"},
+        {"subject_code": "SJ", "grade": "C"},
+        {"subject_code": "BI", "grade": "B"},
+        {"subject_code": "PSV", "grade": "A"},
+        {"subject_code": "BU", "grade": "A-"},
+        {"subject_code": "RBG", "grade": "B+"}
+      ],
+      "call_interest_answers": true,
+      "interest_picks": [
+        {"question_text": "Which school activity would you pick?", "option_text": "Design posters for an event"},
+        {"question_text": "On a free Saturday, you'd rather…", "option_text": "Make a short video for social media"},
+        {"question_text": "Which video would you click first?", "option_text": "Behind the scenes of a TV show"},
+        {"question_text": "Which club would you join?", "option_text": "Art or photography"},
+        {"question_text": "Which task sounds most satisfying?", "option_text": "Designing the layout of a room"},
+        {"question_text": "Which headline catches your eye?", "option_text": "Local artist wins award"}
+      ]
+    },
+    {
+      "name": "rahman",
+      "is_citizen": true,
+      "race": "Anak Negeri Sabah",
+      "spm_year": 2025,
+      "results": [
+        {"subject_code": "BM", "grade": "C"},
+        {"subject_code": "SJ", "grade": "D"},
+        {"subject_code": "BI", "grade": "C"},
+        {"subject_code": "MT", "grade": "D"},
+        {"subject_code": "MTT", "grade": "D"},
+        {"subject_code": "GG", "grade": "C"},
+        {"subject_code": "PI", "grade": "D"},
+        {"subject_code": "EK", "grade": "C"},
+        {"subject_code": "SK", "grade": "D"}
+      ],
+      "call_interest_answers": false,
+      "interest_picks": []
+    },
+    {
+      "name": "aisyah",
+      "is_citizen": true,
+      "race": "Melayu",
+      "spm_year": 2025,
+      "results": [
+        {"subject_code": "BM", "grade": "A"},
+        {"subject_code": "SJ", "grade": "A-"},
+        {"subject_code": "BI", "grade": "A-"},
+        {"subject_code": "MT", "grade": "B+"},
+        {"subject_code": "EK", "grade": "B"},
+        {"subject_code": "PP", "grade": "B"},
+        {"subject_code": "GG", "grade": "A"}
+      ],
+      "call_interest_answers": true,
+      "interest_picks": [
+        {"question_text": "Which school activity would you pick?", "option_text": "Help at the school sick bay"},
+        {"question_text": "Which topic sounds most interesting?", "option_text": "How the body fights disease"},
+        {"question_text": "What kind of problem do you enjoy?", "option_text": "Calming down an upset friend"},
+        {"question_text": "Which video would you click first?", "option_text": "A day in the life of a nurse"},
+        {"question_text": "Which task sounds most satisfying?", "option_text": "Helping an elderly person day to day"},
+        {"question_text": "Which headline catches your eye?", "option_text": "New medicine approved for diabetes"},
+        {"question_text": "With RM1,000 for a project, you'd…", "option_text": "Fund a health check-up day for your kampung"},
+        {"question_text": "Which skill do you most want?", "option_text": "Caring for patients"},
+        {"question_text": "Your dream workplace is…", "option_text": "A hospital or clinic"}
+      ]
+    },
+    {
+      "name": "daniel",
+      "is_citizen": false,
+      "race": "Cina",
+      "spm_year": 2025,
+      "results": [
+        {"subject_code": "BM", "grade": "A"},
+        {"subject_code": "SJ", "grade": "A"},
+        {"subject_code": "BI", "grade": "A+"},
+        {"subject_code": "MT", "grade": "A"},
+        {"subject_code": "FZ", "grade": "A-"},
+        {"subject_code": "KM", "grade": "B+"},
+        {"subject_code": "EK", "grade": "A-"},
+        {"subject_code": "PSV", "grade": "B"}
+      ],
+      "call_interest_answers": true,
+      "interest_picks": [
+        {"question_text": "Which school activity would you pick?", "option_text": "Run a stall at the school fair"},
+        {"question_text": "Which video would you click first?", "option_text": "Starting a business at 18"},
+        {"question_text": "Which achievement would make you proudest?", "option_text": "Opening your own shop"}
+      ]
+    }
+  ]
+}
