@@ -1,0 +1,312 @@
+"""API tests for student input (PRD T1, T2, T6; plan Phase 4 Check):
+`GET/PUT /me/results`, `GET /interest-test`, `PUT /me/interest-answers`.
+
+Runs against the real, separate test database (see `tests/conftest.py`),
+already migrated with the reference-data (subjects) and the seeded interest
+test (Phase 4 data migration) before any test runs.
+"""
+
+from sqlalchemy import select
+
+from app.models.interest_test import InterestAnswer
+from app.models.spm_result import SPMResult
+
+
+def _register_and_login(client, make_register_payload, **overrides):
+    payload = make_register_payload(**overrides)
+    register_response = client.post("/auth/register", json=payload)
+    assert register_response.status_code == 201
+    login_response = client.post("/auth/login", json={"email": payload["email"], "password": payload["password"]})
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
+    return payload, token, register_response.json()["id"]
+
+
+def _auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+# --- GET/PUT /me/results ---------------------------------------------------
+
+
+def test_put_results_rejects_bad_grades(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+
+    for bad_grade in ("B-", "C-", "F"):
+        resp = client.put(
+            "/me/results",
+            json=[
+                {"subject_code": "BM", "grade": bad_grade},
+                {"subject_code": "SJ", "grade": "E"},
+            ],
+            headers=_auth(token),
+        )
+        assert resp.status_code == 422, bad_grade
+
+
+def test_put_results_rejects_unknown_subject(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+
+    resp = client.put(
+        "/me/results",
+        json=[
+            {"subject_code": "BM", "grade": "C"},
+            {"subject_code": "SJ", "grade": "E"},
+            {"subject_code": "NOT-A-REAL-SUBJECT", "grade": "A"},
+        ],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+    assert "NOT-A-REAL-SUBJECT" in resp.json()["detail"]
+
+
+def test_put_results_requires_bm_and_sejarah(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+
+    resp = client.put(
+        "/me/results",
+        json=[{"subject_code": "MT", "grade": "A"}],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert "BM" in detail
+    assert "SJ" in detail
+
+
+def test_put_results_rejects_duplicate_subject_in_payload(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+
+    resp = client.put(
+        "/me/results",
+        json=[
+            {"subject_code": "BM", "grade": "C"},
+            {"subject_code": "BM", "grade": "B"},
+            {"subject_code": "SJ", "grade": "E"},
+        ],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+
+
+def test_put_results_upserts_without_dropping_omitted_subjects(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+
+    first = client.put(
+        "/me/results",
+        json=[
+            {"subject_code": "BM", "grade": "C"},
+            {"subject_code": "SJ", "grade": "E"},
+            {"subject_code": "MT", "grade": "B"},
+        ],
+        headers=_auth(token),
+    )
+    assert first.status_code == 200
+    first_grades = {r["subject_code"]: r["grade"] for r in first.json()}
+    assert first_grades == {"BM": "C", "SJ": "E", "MT": "B"}
+
+    # Re-save with just BM's grade changed; MT (omitted this time) must
+    # still be there afterwards -- PUT /me/results upserts, it doesn't
+    # delete a subject the payload happens to omit (PRD T6).
+    second = client.put(
+        "/me/results",
+        json=[
+            {"subject_code": "BM", "grade": "A"},
+            {"subject_code": "SJ", "grade": "E"},
+        ],
+        headers=_auth(token),
+    )
+    assert second.status_code == 200
+
+    get_resp = client.get("/me/results", headers=_auth(token))
+    assert get_resp.status_code == 200
+    grades = {r["subject_code"]: r["grade"] for r in get_resp.json()}
+    assert grades == {"BM": "A", "SJ": "E", "MT": "B"}
+
+
+def test_results_are_scoped_to_the_caller(client, make_register_payload):
+    _, token_a, _ = _register_and_login(client, make_register_payload)
+    _, token_b, _ = _register_and_login(client, make_register_payload)
+
+    put_a = client.put(
+        "/me/results",
+        json=[{"subject_code": "BM", "grade": "A"}, {"subject_code": "SJ", "grade": "E"}],
+        headers=_auth(token_a),
+    )
+    assert put_a.status_code == 200
+
+    # B never saved any results -- B's own GET must be empty, never A's rows.
+    get_b = client.get("/me/results", headers=_auth(token_b))
+    assert get_b.status_code == 200
+    assert get_b.json() == []
+
+
+def test_results_require_auth(client):
+    resp = client.get("/me/results")
+    assert resp.status_code in (401, 403)
+    resp = client.put("/me/results", json=[])
+    assert resp.status_code in (401, 403)
+
+
+# --- GET /interest-test -----------------------------------------------------
+
+
+def test_read_interest_test_shape_and_no_area_leak(client):
+    resp = client.get("/interest-test")
+    assert resp.status_code == 200
+    questions = resp.json()
+    assert len(questions) == 20
+
+    for question in questions:
+        assert set(question.keys()) == {"id", "text", "options"}
+        # 4 tagged options + "None of the above" == 5.
+        assert len(question["options"]) == 5
+        for option in question["options"]:
+            assert set(option.keys()) == {"id", "text"}
+        assert any(option["text"] == "None of the above" for option in question["options"])
+
+
+# --- PUT /me/interest-answers ------------------------------------------------
+
+
+def _first_two_questions_with_options(client) -> list[dict]:
+    questions = client.get("/interest-test").json()
+    return questions[:2]
+
+
+def test_put_interest_answers_happy_path_and_retake_replaces(client, make_register_payload, db_session):
+    _, token, user_id = _register_and_login(client, make_register_payload)
+    q1, q2 = _first_two_questions_with_options(client)
+
+    first_payload = [
+        {"question_id": q1["id"], "option_id": q1["options"][0]["id"]},
+        {"question_id": q2["id"], "option_id": q2["options"][1]["id"]},
+    ]
+    first_resp = client.put("/me/interest-answers", json=first_payload, headers=_auth(token))
+    assert first_resp.status_code == 200
+    assert {(a["question_id"], a["option_id"]) for a in first_resp.json()} == {
+        (q1["id"], q1["options"][0]["id"]),
+        (q2["id"], q2["options"][1]["id"]),
+    }
+
+    # Retake: answer q1 differently, and don't answer q2 at all this time.
+    second_payload = [{"question_id": q1["id"], "option_id": q1["options"][2]["id"]}]
+    second_resp = client.put("/me/interest-answers", json=second_payload, headers=_auth(token))
+    assert second_resp.status_code == 200
+
+    rows = db_session.execute(select(InterestAnswer).where(InterestAnswer.user_id == user_id)).scalars().all()
+    saved = {(row.question_id, row.chosen_option_id) for row in rows}
+    # Old answers (including q2's, which the retake omitted) are gone;
+    # only the new set remains.
+    assert saved == {(q1["id"], q1["options"][2]["id"])}
+
+
+def test_put_interest_answers_rejects_unknown_question_id(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    q1 = _first_two_questions_with_options(client)[0]
+
+    resp = client.put(
+        "/me/interest-answers",
+        json=[{"question_id": 999999, "option_id": q1["options"][0]["id"]}],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+
+
+def test_put_interest_answers_rejects_unknown_option_id(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    q1 = _first_two_questions_with_options(client)[0]
+
+    resp = client.put(
+        "/me/interest-answers",
+        json=[{"question_id": q1["id"], "option_id": 999999}],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+
+
+def test_put_interest_answers_rejects_option_from_another_question(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    q1, q2 = _first_two_questions_with_options(client)
+
+    resp = client.put(
+        "/me/interest-answers",
+        # q1's question id paired with one of q2's option ids.
+        json=[{"question_id": q1["id"], "option_id": q2["options"][0]["id"]}],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+
+
+def test_put_interest_answers_rejects_duplicate_question_in_payload(client, make_register_payload):
+    _, token, _ = _register_and_login(client, make_register_payload)
+    q1 = _first_two_questions_with_options(client)[0]
+
+    resp = client.put(
+        "/me/interest-answers",
+        json=[
+            {"question_id": q1["id"], "option_id": q1["options"][0]["id"]},
+            {"question_id": q1["id"], "option_id": q1["options"][1]["id"]},
+        ],
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+
+
+def test_interest_answers_are_scoped_to_the_caller(client, make_register_payload, db_session):
+    _, token_a, user_id_a = _register_and_login(client, make_register_payload)
+    _, token_b, user_id_b = _register_and_login(client, make_register_payload)
+    q1 = _first_two_questions_with_options(client)[0]
+
+    resp_a = client.put(
+        "/me/interest-answers",
+        json=[{"question_id": q1["id"], "option_id": q1["options"][0]["id"]}],
+        headers=_auth(token_a),
+    )
+    assert resp_a.status_code == 200
+
+    # B retaking (even with no overlap) must never touch A's rows.
+    resp_b = client.put("/me/interest-answers", json=[], headers=_auth(token_b))
+    assert resp_b.status_code == 200
+
+    rows_a = db_session.execute(select(InterestAnswer).where(InterestAnswer.user_id == user_id_a)).scalars().all()
+    assert len(rows_a) == 1
+    rows_b = db_session.execute(select(InterestAnswer).where(InterestAnswer.user_id == user_id_b)).scalars().all()
+    assert len(rows_b) == 0
+
+
+def test_interest_answers_require_auth(client):
+    resp = client.put("/me/interest-answers", json=[])
+    assert resp.status_code in (401, 403)
+
+
+# --- DELETE /me cascades student input rows ---------------------------------
+
+
+def test_delete_me_cascades_results_and_interest_answers(client, make_register_payload, db_session):
+    _, token, user_id = _register_and_login(client, make_register_payload)
+    q1 = _first_two_questions_with_options(client)[0]
+
+    put_results = client.put(
+        "/me/results",
+        json=[{"subject_code": "BM", "grade": "A"}, {"subject_code": "SJ", "grade": "E"}],
+        headers=_auth(token),
+    )
+    assert put_results.status_code == 200
+
+    put_answers = client.put(
+        "/me/interest-answers",
+        json=[{"question_id": q1["id"], "option_id": q1["options"][0]["id"]}],
+        headers=_auth(token),
+    )
+    assert put_answers.status_code == 200
+
+    delete_resp = client.delete("/me", headers=_auth(token))
+    assert delete_resp.status_code == 204
+
+    remaining_results = db_session.execute(select(SPMResult).where(SPMResult.user_id == user_id)).scalars().all()
+    remaining_answers = db_session.execute(
+        select(InterestAnswer).where(InterestAnswer.user_id == user_id)
+    ).scalars().all()
+    assert remaining_results == []
+    assert remaining_answers == []

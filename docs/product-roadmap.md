@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** the build order for FurtherXpert, in 7 phases.
 > - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), and Phase 3 (reference data) are shipped. Phase 4 (student input) is next.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), and Phase 4 (student input, backend only) are shipped. Phase 5 (rules engine) is next.
 > - **Where the details live:** `docs/prd/furtherxpert-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
@@ -71,7 +71,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/furtherxpert-prd.md` (T1, T6) | `backend/app/api/`, `backend/app/models/` | draft | Features: SPM results, interest test |
+| `docs/prd/furtherxpert-prd.md` (T1, T6) | `backend/app/api/`, `backend/app/models/` | shipped | Backend only. Confirmed live 2026-09-12: `PUT /me/results` and `PUT /me/interest-answers` reject bad grades, unknown subjects, and unknown question/option ids; a retake fully replaces old interest answers; a student can't read or write another student's data; deleting an account cascades to `spm_results` and `interest_answers`. 59 backend tests pass. No screens yet (client pages come in Phase 6) |
 
 ### Phase 5: Rules engine
 
@@ -105,10 +105,10 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 | Concern | Introduced In | Matured In | Current State |
 |---|---|---|---|
 | Docker setup | Phase 1 | Phase 3 | Running live: db + backend + client |
-| Login and access control (JWT) | Phase 2 | Phase 4 | Backend done: sign up, log in, refresh, log out, view/delete account, all guarded by JWT (JSON Web Token, a signed login pass). No client screens yet |
-| Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4 |
-| Database migrations (Alembic) | Phase 1 | Phase 3 | 3 migrations: the `users` table, the reference-data tables, and the sesi 2026/2027 data load. A data migration replaces one session's rows on each re-run, other sessions untouched |
-| Automated tests | Phase 1 | Phase 5 | 43 tests pass (health + accounts + importer + reference routes), on a separate test database |
+| Login and access control (JWT) | Phase 2 | Phase 4 | Backend done: sign up, log in, refresh, log out, view/delete account, plus the new `/me/results` and `/me/interest-answers` routes, all guarded by JWT (JSON Web Token, a signed login pass) and scoped to the caller only. No client screens yet |
+| Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4. Confirmed live 2026-09-12: `DELETE /me` cascades to `spm_results` and `interest_answers` too, not just the account row |
+| Database migrations (Alembic) | Phase 1 | Phase 4 | 5 migrations: the `users` table, the reference-data tables, the sesi 2026/2027 data load, the student-input tables (`spm_results`, `interest_questions`, `interest_options`, `interest_answers`), and the approved interest-test seed. Both data migrations replace their own rows on each re-run, leaving everything else untouched |
+| Automated tests | Phase 1 | Phase 5 | 59 tests pass (health + accounts + importer + reference routes + student input), on a separate test database |
 
 ## PRD Registry
 

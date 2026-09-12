@@ -1,0 +1,39 @@
+{
+  "version": "2026-09-12",
+  "approved_by": "product owner, in-session chat approval 2026-09-12",
+  "drafted_by": "assistant draft, reviewed option-by-option by the product owner before approval",
+  "areas": {
+    "ST": "Science & Technology",
+    "BM": "Business & Management",
+    "LG": "Law & Governance",
+    "HS": "Healthcare & Social Services",
+    "AD": "Arts & Design",
+    "EH": "Education & Humanities",
+    "HT": "Hospitality & Tourism",
+    "AE": "Agriculture & Environment",
+    "MC": "Media & Communications"
+  },
+  "none_option": "None of the above",
+  "questions": [
+    {"n": 1, "text": "Which school activity would you pick?", "options": [["Build a robot or simple app", "ST"], ["Run a stall at the school fair", "BM"], ["Design posters for an event", "AD"], ["Help at the school sick bay", "HS"]]},
+    {"n": 2, "text": "On a free Saturday, you'd rather…", "options": [["Hike or visit a farm", "AE"], ["Try a new café or plan a trip", "HT"], ["Make a short video for social media", "MC"], ["Join a debate", "LG"]]},
+    {"n": 3, "text": "Which topic sounds most interesting?", "options": [["How the body fights disease", "HS"], ["How laws are made", "LG"], ["How stories and history shape people", "EH"], ["How computers solve problems", "ST"]]},
+    {"n": 4, "text": "In a group project, you'd rather…", "options": [["Present the idea to the class", "MC"], ["Teach teammates the tricky parts", "EH"], ["Handle the budget and plan", "BM"], ["Make the slides look great", "AD"]]},
+    {"n": 5, "text": "Which job would you try for a day?", "options": [["Chef or hotel manager", "HT"], ["Vet or plantation officer", "AE"], ["Lawyer", "LG"], ["Engineer at a factory", "ST"]]},
+    {"n": 6, "text": "What kind of problem do you enjoy?", "options": [["Fixing a broken gadget", "ST"], ["Calming down an upset friend", "HS"], ["Settling an argument fairly", "LG"], ["Figuring out why plants aren't growing", "AE"]]},
+    {"n": 7, "text": "Where would you like to work?", "options": [["A newsroom or studio", "MC"], ["A classroom or library", "EH"], ["A resort or airport", "HT"], ["A design studio", "AD"]]},
+    {"n": 8, "text": "Which video would you click first?", "options": [["Starting a business at 18", "BM"], ["Saving forests from climate change", "AE"], ["A day in the life of a nurse", "HS"], ["Behind the scenes of a TV show", "MC"]]},
+    {"n": 9, "text": "Which club would you join?", "options": [["Robotics or coding", "ST"], ["Art or photography", "AD"], ["Language or literature society", "EH"], ["Tourism or culinary club", "HT"]]},
+    {"n": 10, "text": "Which achievement would make you proudest?", "options": [["Winning a debate or moot court", "LG"], ["Growing your own vegetable garden", "AE"], ["Opening your own shop", "BM"], ["Your article in a newspaper", "MC"]]},
+    {"n": 11, "text": "Which task sounds most satisfying?", "options": [["Making every sen in the accounts add up", "BM"], ["Nursing an injured animal back to health", "AE"], ["Helping an elderly person day to day", "HS"], ["Designing the layout of a room", "AD"]]},
+    {"n": 12, "text": "What would you like to learn more about?", "options": [["Planning events and welcoming guests", "HT"], ["How a country is governed", "LG"], ["Explaining things so others understand", "EH"], ["How chemicals react", "ST"]]},
+    {"n": 13, "text": "Which weekend job appeals most?", "options": [["Tour guide", "HT"], ["Tuition teacher", "EH"], ["Sales assistant hitting targets", "BM"], ["Social media admin for a shop", "MC"]]},
+    {"n": 14, "text": "Which headline catches your eye?", "options": [["New medicine approved for diabetes", "HS"], ["Court decides major land case", "LG"], ["Local artist wins award", "AD"], ["Farmers adopt smart irrigation", "AE"]]},
+    {"n": 15, "text": "How do you like to spend free time?", "options": [["Drawing, crafting or making music", "AD"], ["Reading novels or history", "EH"], ["Taking photos and editing videos", "MC"], ["Cooking for family and friends", "HT"]]},
+    {"n": 16, "text": "With RM1,000 for a project, you'd…", "options": [["Buy parts to build a gadget", "ST"], ["Start a small online business", "BM"], ["Fund a health check-up day for your kampung", "HS"], ["Plant trees at your school", "AE"]]},
+    {"n": 17, "text": "Which skill do you most want?", "options": [["Arguing a case with evidence", "LG"], ["Telling stories through video", "MC"], ["Caring for patients", "HS"], ["Serving customers so they come back", "HT"]]},
+    {"n": 18, "text": "Which subject do you enjoy (even if it's not your best)?", "options": [["Science or Computer Science", "ST"], ["Art or Design & Technology", "AD"], ["Sejarah or Literature", "EH"], ["Economics or Accounting", "BM"]]},
+    {"n": 19, "text": "Which volunteer role would you pick?", "options": [["Helping at a legal aid clinic", "LG"], ["Teaching kids to read", "EH"], ["Welcoming tourists at a festival", "HT"], ["Cleaning up a river", "AE"]]},
+    {"n": 20, "text": "Your dream workplace is…", "options": [["A hospital or clinic", "HS"], ["A lab or tech company", "ST"], ["An art gallery or design agency", "AD"], ["A radio station or ad agency", "MC"]]}
+  ]
+}

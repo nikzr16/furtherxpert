@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** how the app behaves **today**: what happens, step by step, when a student uses it.
 > - **Why:** when you change code, this doc is the spec for current behaviour. If code and this doc disagree, fix one of them.
-> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), and reference data (the yearly import, plus the subject/university/program lookup routes). Each new phase adds its flow here.
+> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), and student input (saving SPM results, taking or retaking the interest test, reading your own data back). Each new phase adds its flow here.
 
 > **Type:** Workflow | **Must stay current:** Yes -- update when behavior changes
 
@@ -20,7 +20,7 @@ Add one "Flow" section per feature as phases ship.
 
 ## Purpose
 
-Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2) and **reference data** (Phase 3). Only the backend exists yet. There are no screens until Phase 6, so flows start from API requests -- except the yearly import below, which a developer runs by hand.
+Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2), **reference data** (Phase 3), and **student input** (Phase 4). Only the backend exists yet. There are no screens until Phase 6, so flows start from API requests -- except the yearly import below, which a developer runs by hand.
 
 ## Trigger
 
@@ -128,6 +128,48 @@ These 4 routes are **public** -- no login needed, because they're just lookup li
 - **`GET /programs/{code}`** -- one program's full detail: everything in the list result, plus its career paths, its entry-rule tree for both categories, the original Malay rule text, and a source credit line (for example "Source: e-Panduan UPU, KPT, sesi 2026/2027").
   - **On failure:** `404` "Program not found" if the code doesn't exist in the current session.
 
+## Flow 3: Student input
+
+Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school leaving exam) results a student enters by hand, and their answers to the 20-question interest test. Both are personal data, so every route in this flow needs a login, and each route only ever touches the logged-in student's own rows -- the same rule as Flow 1's `/me` routes.
+
+### 1. Save SPM results
+
+**Input:** `PUT /me/results` with a list of `{subject_code, grade}` pairs.
+**Actions:**
+1. Check each grade is one of the 10 real SPM grades: `A+ A A- B+ B C+ C D E G`. There's no `B-`, `C-`, or `F`.
+2. Check the payload has no repeated subject code.
+3. Check Bahasa Melayu (`BM`) and Sejarah (`SJ`) are both in the payload -- the official entry rules (**syarat am**, general requirements) always need both, so every save must include them.
+4. Check every subject code is a real one from `GET /subjects`.
+5. **Upsert** each row: update the grade if the student already saved that subject, insert a new row otherwise. A save never deletes a subject the payload leaves out -- so a student can top up their results over several saves without re-typing everything each time.
+
+**Output:** `200` with the student's full, current results list (subject code, both subject names, grade), sorted by subject name.
+**On failure:** `400` with a message naming the problem -- a bad grade, a duplicate subject in the payload, a missing `BM`/`SJ` row, or an unknown subject code.
+
+### 2. Read your own SPM results
+
+**Input:** `GET /me/results`.
+**Output:** `200` with the same list shape as above -- every subject the student has saved so far, or an empty list if none yet.
+
+### 3. Take or retake the interest test
+
+**Input:** `GET /interest-test` (no login needed -- it's a fixed question list, not personal data, same as Flow 2's lookup routes). Returns all 20 questions, each with its options' text and id only -- **never** which interest area an option counts toward. That's on purpose: knowing the mapping would let a student game their own score.
+
+**Input:** `PUT /me/interest-answers` with a list of `{question_id, option_id}` pairs.
+**Actions:**
+1. Check the payload has no repeated question id, and every question id and option id is real.
+2. Check each option actually belongs to the question it's paired with -- a mismatched pair (option from a different question) is rejected.
+3. **Retake = full replace:** delete every one of the student's previous answers, then insert the new payload's rows, in the same database transaction. So a retake can never leave a mix of old and new answers.
+4. A payload doesn't have to cover all 20 questions -- whatever subset is sent becomes the student's whole new answer set. Each interest area's score is worked out from picks made, not from a fixed total (PRD T1), so a partial answer set still scores correctly.
+
+**Output:** `200` with the saved `{question_id, option_id}` pairs.
+**On failure:** `400` with a message naming the problem -- a duplicate question id, an unknown question or option id, or an option that doesn't belong to its question.
+
+### 4. Deleting your account cleans up both
+
+`DELETE /me` (Flow 1) removes the student's `spm_results` and `interest_answers` rows automatically, the same way it will for every future student table: the tables point back at `users` with `ON DELETE CASCADE`, so the database removes them as part of deleting the account row -- no extra clean-up code needed.
+
+> **Watch out:** `spm_results` and `interest_answers` are keyed to a login, not a name or email. So even the student who "owns" the data can only reach it through their own access token -- there's no route that takes another student's id.
+
 ## Error States
 
 | Error | Cause | Handling |
@@ -138,6 +180,8 @@ These 4 routes are **public** -- no login needed, because they're just lookup li
 | `422` Validation error | Bad sign-up data | The client shows the field error |
 | `429` Too many requests | More than 5 login or sign-up tries per minute from one IP address | The client asks the student to wait a minute |
 | `404` Program not found | `GET /programs/{code}` with a code not in the current session | The client shows a "not found" message |
+| `400` Bad SPM result save | `PUT /me/results` with a bad grade, a duplicate subject, a missing `BM`/`SJ` row, or an unknown subject code | The client shows the field error and doesn't save |
+| `400` Bad interest-answer save | `PUT /me/interest-answers` with a duplicate question id, an unknown question/option id, or an option that doesn't match its question | The client shows the field error and doesn't save |
 
 ## Defaults
 
@@ -160,12 +204,14 @@ These 4 routes are **public** -- no login needed, because they're just lookup li
 - Refresh and logout have no rate limit yet (only login and sign-up do).
 - The reference-data routes (`/subjects`, `/universities`, `/programs`, `/programs/{code}`) need no login and read only the most recently loaded session.
 - The importer only fetches one page at a time -- it never runs requests to e-Panduan in parallel.
+- `PUT /me/results` is **upsert-only**: it never deletes a subject the payload leaves out. To remove a saved subject, a future route would need to add that on purpose.
+- `PUT /me/interest-answers` is a **full replace** every time: it always clears the student's previous answers first, then saves the new payload as the whole new set.
 
 ## Related Documents
 
 | Document | Type | Relationship |
 |---|---|---|
-| `docs/prd/furtherxpert-prd.md` | Intent | Product goals these flows fulfil (T2, T3, T4, T5, T6) |
+| `docs/prd/furtherxpert-prd.md` | Intent | Product goals these flows fulfil (T1, T2, T3, T4, T5, T6) |
 | `docs/plan/furtherxpert-plan.md` | Plan | How the flows were planned |
 | `docs/reference/folder-structure.md` | Reference | Where each file of these flows lives |
 | `docs/decisions/NNNN-*.md` | Decision log | Deviations from the plan |

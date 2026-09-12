@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** a map of where every part of FurtherXpert lives.
 > - **Why:** so anyone can find the right file fast, and put new files in the right place.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), and Phase 3 (reference data) are built. Items marked *(planned)* come in later phases.
+> - **Now:** Phase 1 (foundation), Phase 2 (accounts, backend only), Phase 3 (reference data), and Phase 4 (student input, backend only) are built. Items marked *(planned)* come in later phases.
 
 > **Type:** Reference | **Must stay current:** Yes -- update when structure, routes, schemas, or config change
 
@@ -51,17 +51,22 @@ furtherxpert/
 │   │   └── versions/
 │   │       ├── fe17fc1fca80_add_users_table.py             creates the `users` table
 │   │       ├── 57ab2a90bfa6_add_reference_data_tables.py   creates the reference-data tables (Phase 3)
-│   │       └── 6676e66b52e5_load_2026_2027_upu_snapshot.py loads the sesi 2026/2027 snapshot (Phase 3)
-│   ├── data/upu/                   e-Panduan snapshots
-│   │   ├── 2026-2027.json          committed snapshot (Phase 3)
-│   │   └── .cache/                 raw HTML resume cache -- gitignored, never committed
+│   │       ├── 6676e66b52e5_load_2026_2027_upu_snapshot.py loads the sesi 2026/2027 snapshot (Phase 3)
+│   │       ├── 23947a34f766_add_student_input_tables.py    creates the student-input tables (Phase 4)
+│   │       └── 1fa628967fac_seed_approved_interest_test.py loads the approved interest test (Phase 4)
+│   ├── data/
+│   │   ├── interest_test.json      the 20 approved interest-test questions (Phase 4)
+│   │   └── upu/                    e-Panduan snapshots
+│   │       ├── 2026-2027.json      committed snapshot (Phase 3)
+│   │       └── .cache/             raw HTML resume cache -- gitignored, never committed
 │   ├── app/
 │   │   ├── main.py                 creates the app, CORS, routers
 │   │   ├── api/health.py           GET /health
 │   │   ├── api/deps.py             shared dependency: finds the logged-in user from the access token
 │   │   ├── api/auth.py             POST /auth/register, /auth/login, /auth/refresh, /auth/logout
-│   │   ├── api/me.py               GET /me, DELETE /me
+│   │   ├── api/me.py               GET /me, DELETE /me, GET+PUT /me/results, PUT /me/interest-answers (Phase 4)
 │   │   ├── api/reference.py        GET /subjects, /universities, /programs, /programs/{code} (Phase 3)
+│   │   ├── api/interest_test.py    GET /interest-test (Phase 4)
 │   │   ├── core/config.py          reads settings from .env
 │   │   ├── core/db.py              database connection + Base
 │   │   ├── core/security.py        makes/checks login tokens, scrambles passwords
@@ -73,10 +78,16 @@ furtherxpert/
 │   │   ├── models/interest_area.py `interest_areas` table (Phase 3)
 │   │   ├── models/program.py       `programs` + `campuses` tables (Phase 3)
 │   │   ├── models/requirement.py   `general_requirements` + `program_requirements` tables (Phase 3)
+│   │   ├── models/spm_result.py    `spm_results` table (Phase 4)
+│   │   ├── models/interest_test.py `interest_questions` + `interest_options` + `interest_answers` tables (Phase 4)
 │   │   ├── schemas/user.py         request/response shapes for accounts
 │   │   ├── schemas/reference.py    request/response shapes for reference data (Phase 3)
+│   │   ├── schemas/spm_result.py   request/response shapes for SPM results (Phase 4)
+│   │   ├── schemas/interest_test.py request/response shapes for the interest test (Phase 4)
 │   │   ├── services/auth.py        sign-up and login rules (empty for scoring, eligibility, AI -- later phases)
 │   │   ├── services/reference.py   reads subjects, universities, and programs for the routes (Phase 3)
+│   │   ├── services/results.py     reads and upserts a student's SPM results (Phase 4)
+│   │   ├── services/interest_test.py reads the question list and replaces a student's answers (Phase 4)
 │   │   └── importer/               e-Panduan importer (Phase 3)
 │   │       ├── epanduan.py         fetches e-Panduan and writes the session snapshot
 │   │       ├── subjects.py         hand-written Malay subject name -> subject code map
@@ -87,6 +98,7 @@ furtherxpert/
 │       ├── test_auth.py            account tests: sign up, log in, refresh, log out, view/delete account
 │       ├── test_importer_epanduan.py   importer parser tests, on saved real e-Panduan pages (Phase 3)
 │       ├── test_reference_routes.py    /subjects, /universities, /programs, /programs/{code} route tests (Phase 3)
+│       ├── test_student_input.py   /me/results and interest-test route tests, incl. delete-account cascade (Phase 4)
 │       ├── fixtures/               saved real e-Panduan HTML pages used by the importer tests (Phase 3)
 │       └── golden/                 sample-student tests (planned, Phase 5)
 ├── client/
@@ -111,9 +123,10 @@ furtherxpert/
 | `backend/app/main.py` | Creates the FastAPI app. Allows only `FRONTEND_ORIGIN` (CORS). Plugs in routers |
 | `backend/app/api/health.py` | `GET /health`: always HTTP 200, with `{"status":"ok","db":"ok"}` or `"db":"error"` |
 | `backend/app/api/auth.py` | Account routes that don't need a login: register, log in, refresh, log out |
-| `backend/app/api/me.py` | Account routes that need a login: view or delete the current account |
+| `backend/app/api/me.py` | Account routes that need a login: view or delete the current account, save/read SPM results, save interest-test answers (Phase 4) |
 | `backend/app/api/deps.py` | Shared dependency (`get_current_user`): reads the `Authorization` header, checks the access token, and looks up the matching row in `users`. Every `/me` route uses this -- never a user id typed in the request itself |
 | `backend/app/api/reference.py` | Reference-data routes, no login needed: `GET /subjects`, `GET /universities`, `GET /programs` (filter by `area`, `university`, `q`), `GET /programs/{code}` |
+| `backend/app/api/interest_test.py` | `GET /interest-test`: the 20 questions and their options, no login needed. Never returns which option maps to which interest area (Phase 4) |
 | `backend/app/core/config.py` | Loads the `.env` settings (pydantic-settings) |
 | `backend/app/core/db.py` | SQLAlchemy engine, session, and `Base` for tables |
 | `backend/app/core/security.py` | Creates and checks **JWT** (JSON Web Token, a signed login pass) access/refresh tokens; scrambles and checks passwords with **argon2** (a one-way password-scrambling method) |
@@ -125,10 +138,16 @@ furtherxpert/
 | `backend/app/models/interest_area.py` | The `interest_areas` table: NEC code prefixes -> area name, and which subject groups count toward that area's "excel" score (PRD T1) |
 | `backend/app/models/program.py` | The `programs` and `campuses` tables, loaded from a session snapshot -- never hand-edited |
 | `backend/app/models/requirement.py` | The `general_requirements` (syarat am) and `program_requirements` (syarat khas) tables: the rule tree (`rules`), the original Malay text (`text_ms`), and an `unparsed` flag, per session/program and per UPU category (A/B) |
+| `backend/app/models/spm_result.py` | The `spm_results` table: one row per subject a student has entered a grade for. `ON DELETE CASCADE` to `users`. Defines `SPM_GRADES`, the 10 allowed grades |
+| `backend/app/models/interest_test.py` | The `interest_questions`, `interest_options` (each tagged to an interest area, or untagged for "None of the above"), and `interest_answers` (`ON DELETE CASCADE` to `users`) tables |
 | `backend/app/schemas/user.py` | Pydantic request/response shapes for register, login, and the current-account view |
 | `backend/app/schemas/reference.py` | Pydantic request/response shapes for the reference-data routes |
+| `backend/app/schemas/spm_result.py` | Pydantic request/response shapes for `GET`/`PUT /me/results`. Validates the grade is one of `SPM_GRADES` |
+| `backend/app/schemas/interest_test.py` | Pydantic request/response shapes for `GET /interest-test` and `PUT /me/interest-answers`. The public option shape carries no area id or name |
 | `backend/app/services/auth.py` | Sign-up and login business rules: creates the account, checks the password, keeps login timing the same whether the email exists or not |
 | `backend/app/services/reference.py` | Reference-data reads: subjects, universities, and programs (with `area`/`university`/`q` filters), always from the most recently loaded session |
+| `backend/app/services/results.py` | SPM-results read and upsert: validates subject codes against the database, requires Bahasa Melayu (`BM`) and Sejarah (`SJ`) in every save, never deletes a subject the payload leaves out |
+| `backend/app/services/interest_test.py` | Interest-test reads (question list with options) and answer replacement: a retake deletes all of a student's previous answers and inserts the new set in one transaction |
 | `backend/app/importer/epanduan.py` | Sequentially fetches e-Panduan's program lists and rule pages (1 request at a time, paused, retried with backoff), parses them with **selectolax** (decision `0002`), and writes a session snapshot |
 | `backend/app/importer/subjects.py` | Hand-written list mapping every Malay subject name (and old-syllabus name) seen on e-Panduan to one subject code. Raises `UnknownSubjectError` on an unmapped name, which stops the import |
 | `backend/app/importer/reference_data.py` | Hand-written university code -> name list (20 universities), and the PRD T1 interest-area mapping |
@@ -136,6 +155,8 @@ furtherxpert/
 | `backend/migrations/versions/fe17fc1fca80_add_users_table.py` | First real migration: creates the `users` table (see **Database tables** below) |
 | `backend/migrations/versions/57ab2a90bfa6_add_reference_data_tables.py` | Second migration: creates the 9 reference-data tables. No rows loaded yet |
 | `backend/migrations/versions/6676e66b52e5_load_2026_2027_upu_snapshot.py` | Third migration: seeds the shared tables (universities, subjects, subject_groups, interest_areas) and loads `backend/data/upu/2026-2027.json` into the session-scoped tables. Re-running it replaces that session's rows only |
+| `backend/migrations/versions/23947a34f766_add_student_input_tables.py` | Fourth migration: creates `spm_results`, `interest_questions`, `interest_options`, and `interest_answers`. No rows loaded yet |
+| `backend/migrations/versions/1fa628967fac_seed_approved_interest_test.py` | Fifth migration: loads `backend/data/interest_test.json` (the 20 product owner-approved questions) into `interest_questions`/`interest_options`, tagging each option to its interest area. Re-running it fully replaces every question and option -- see decision `0004` for why it doesn't key the replace on the file's `version` field |
 
 ## Routes
 
@@ -152,14 +173,18 @@ furtherxpert/
 | `GET` | `/universities` | No | List every public university's code and name |
 | `GET` | `/programs` | No | List programs for the most recently loaded session. Optional filters: `area`, `university`, `q` (text search) |
 | `GET` | `/programs/{code}` | No | One program's full detail: rules for both categories, original Malay text, source credit. `404` if the code isn't in the current session |
+| `GET` | `/interest-test` | No | List all 20 interest-test questions and their options. Never reveals which option maps to which interest area |
+| `GET` | `/me/results` | Yes | The logged-in student's own saved SPM results |
+| `PUT` | `/me/results` | Yes | Upsert (update-or-insert) SPM results. Requires `BM` and `SJ` in the payload, rejects bad grades, duplicate subjects, or unknown subject codes |
+| `PUT` | `/me/interest-answers` | Yes | Replace the logged-in student's interest-test answers. A retake fully replaces the old set. Rejects duplicate question ids, unknown question/option ids, or an option that doesn't belong to its question |
 
-> **Watch out:** every `/me` route only ever acts on the account tied to the access token. A student can never read or delete another student's account, even if they guess an id.
+> **Watch out:** every `/me` route only ever acts on the account tied to the access token. A student can never read or delete another student's account, results, or interest answers, even if they guess an id.
 
 ## Database tables
 
 | Table | Columns | Notes |
 |---|---|---|
-| `users` | `id` (UUID, primary key), `email` (unique, lower-cased), `password_hash`, `is_citizen` (bool), `race` (must be one of 7 fixed values, checked by the database), `spm_year` (int, range-checked by the database), `consent_at` (when sign-up consent was given), `created_at` | Added by migration `fe17fc1fca80`. `id` has no other meaning on purpose, so Phase 4's student tables (`spm_results`, `interest_answers`, `analysis`) can each point back at it with `ON DELETE CASCADE` -- deleting a user then removes every row that depends on it automatically |
+| `users` | `id` (UUID, primary key), `email` (unique, lower-cased), `password_hash`, `is_citizen` (bool), `race` (must be one of 7 fixed values, checked by the database), `spm_year` (int, range-checked by the database), `consent_at` (when sign-up consent was given), `created_at` | Added by migration `fe17fc1fca80`. `id` has no other meaning on purpose, so student tables (`spm_results`, `interest_answers`, and Phase 5's `analysis`) can each point back at it with `ON DELETE CASCADE` -- deleting a user then removes every row that depends on it automatically |
 | `sessions` | `id`, `name` (unique, e.g. "2026/2027"), `latest_spm_year`, `created_at` | Added by migration `57ab2a90bfa6`, loaded by `6676e66b52e5`. One row per yearly import. `latest_spm_year` decides which SPM year counts as category A (PRD T2) |
 | `universities` | `id`, `code` (4 chars, unique, e.g. "UE"), `name` | Not session-scoped -- stable across years. 20 rows loaded, from the hand-written list in `app/importer/reference_data.py` |
 | `subject_groups` | `id`, `code` (unique, e.g. "SCIENCES"), `name` | Seeded from `app/importer/subjects.py`, not scraped |
@@ -169,6 +194,10 @@ furtherxpert/
 | `campuses` | `id`, `program_id`, `name` | One row per campus a program is offered at |
 | `general_requirements` | `id`, `session_id`, `category` ("A" or "B"), `rules` (JSON rule tree), `text_ms` (original Malay text), `unparsed` (bool) | Syarat am: same for every program in a session + category |
 | `program_requirements` | `id`, `program_id`, `category` ("A" or "B"), `rules` (JSON rule tree), `text_ms`, `unparsed` (bool) | Syarat khas: one row per program per category. 328 rows loaded for sesi 2026/2027 -- 100% fully parsed (no `unparsed` rows); `unverifiable` entries are interview notes only |
+| `spm_results` | `id`, `user_id` (FK `users`, `ON DELETE CASCADE`), `subject_id` (FK `subjects`), `grade` (checked by the database against the 10 allowed grades) | Added by migration `23947a34f766` (Phase 4). One row per subject a student has saved a grade for. Unique per (`user_id`, `subject_id`) -- `PUT /me/results` upserts on that pair |
+| `interest_questions` | `id`, `n` (unique, 1-20, the question's number in the approved set), `text` | Added by migration `23947a34f766`, loaded by `1fa628967fac` (Phase 4). The 20 product owner-approved questions from `backend/data/interest_test.json` |
+| `interest_options` | `id`, `question_id` (FK `interest_questions`, `ON DELETE CASCADE`), `text`, `area_id` (FK `interest_areas`, nullable) | Added by migration `23947a34f766`, loaded by `1fa628967fac`. 4 area-tagged options per question, plus one "None of the above" option with `area_id` NULL |
+| `interest_answers` | `id`, `user_id` (FK `users`, `ON DELETE CASCADE`), `question_id` (FK `interest_questions`), `chosen_option_id` (FK `interest_options`) | Added by migration `23947a34f766` (Phase 4). One row per (`user_id`, `question_id`) the student has answered -- unique on that pair. `PUT /me/interest-answers` deletes and reinserts all of a student's rows on every save (a retake), so a partial answer set is allowed |
 
 ## Client
 
@@ -196,6 +225,6 @@ furtherxpert/
 
 | Document | Type | Relationship |
 |---|---|---|
-| `docs/prd/furtherxpert-prd.md` | Intent | Product goals behind these structures (T2, T5, T6, T8) |
+| `docs/prd/furtherxpert-prd.md` | Intent | Product goals behind these structures (T1, T2, T5, T6, T8) |
 | `docs/product-roadmap.md` | Roadmap | Which phase adds each *(planned)* item |
 | `docs/decisions/NNNN-*.md` | Decision log | Structural changes that diverged from the plan |
