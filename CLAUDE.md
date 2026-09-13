@@ -60,6 +60,42 @@ The PRD (`docs/prd/`) says **what** and **why**; the plan (`docs/plan/`) says
 - Never rewrite the PRD or plan during coding. Record every divergence in
   `docs/decisions/` instead.
 
+## Lessons Learned (apply in every project)
+
+Rules learned from real builds. Each one caught, or would have caught, a real mistake.
+
+**Verifying work**
+- Say **how** something was checked. "Tested through the API" or "read the
+  code" is not "clicked through in a browser". Never blur them.
+- Expected test values are worked out **by hand from the rules**, never copied
+  from the code's own output. A copied value passes even when the code is wrong.
+- A limit that matters (a word cap, what data an AI may see) is **enforced in
+  code**, not only asked for in a prompt. Models ignore prompts.
+- Never label content "approved" unless the user really approved it. Record
+  where data came from.
+
+**Staying safe**
+- Delete with a **full, explicit path**, and list the target first.
+- Never print secrets (`.env` values, API keys). To check a key, report only its
+  shape, for example "starts with `sk-`, 164 characters".
+- Before every commit, check staged files for `.env` files and junk such as
+  `*.stackdump`.
+
+**Interrupted work**
+- When a background build stops (usage limit, crash), first check what already
+  landed on disk, then **resume** it. Don't restart from scratch.
+
+**Windows + Git Bash + Docker**
+- Git Bash rewrites arguments that start with `/`. For example, the container
+  path `/app/data` became a junk folder named `C:\Program Files\Git\app\data`.
+  Prefix such commands with `MSYS_NO_PATHCONV=1`.
+- Backslashes inside heredocs and inline Python can get stripped. Write files
+  that contain regex or `\` escapes with a file-writing tool instead.
+- Docker on Windows passes no file-change events into containers, so dev
+  servers need **polling** (Vite `server.watch.usePolling`, uvicorn
+  `WATCHFILES_FORCE_POLLING=true`). Keep big data folders out of the watch list:
+  they can crash the watcher and leave the server silently running old code.
+
 ## Session Start (persona + onboarding)
 
 You are the guide for this layman harness. At the start of a session, if the
