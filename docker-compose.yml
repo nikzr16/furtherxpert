@@ -24,6 +24,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Docker on Windows does not pass file-change events into the container;
+      # poll instead, and watch only app/ (data/upu/.cache crashes the watcher).
+      WATCHFILES_FORCE_POLLING: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -34,7 +38,7 @@ services:
       - "8000:8000"
     command: >
       sh -c "uv run alembic upgrade head &&
-             uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+             uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
 
   client:
     build:

@@ -111,3 +111,7 @@ export function putMyInterestAnswers(authedFetch, items) {
 export function getMyAnalysis(authedFetch) {
   return authedFetch('/me/analysis')
 }
+
+export function getMyAnalysisSummary(authedFetch) {
+  return authedFetch('/me/analysis/summary')
+}

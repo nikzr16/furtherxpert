@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** how the app behaves **today**: what happens, step by step, when a student uses it.
 > - **Why:** when you change code, this doc is the spec for current behaviour. If code and this doc disagree, fix one of them.
-> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back, and resuming a part-finished interest test), analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes, and gated on the interest test being fully answered), and the client pages (Phase 6: the 8 screens a student actually sees and clicks through, from registering to deleting their account). Each new phase adds its flow here.
+> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back, and resuming a part-finished interest test), analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes, and gated on the interest test being fully answered), the client pages (Phase 6: the 8 screens a student actually sees and clicks through, from registering to deleting their account), and the AI summary (Phase 7: a short plain-English summary of a student's own charts, built from scores only, cached alongside the charts, and loaded separately so it never blocks or delays them). Phase 7 is the final phase of the first release, so the flows below now cover the full build.
 
 > **Type:** Workflow | **Must stay current:** Yes -- update when behavior changes
 
@@ -20,7 +20,7 @@ Add one "Flow" section per feature as phases ship.
 
 ## Purpose
 
-Describes the live flows of FurtherXpert. So far, that's the **accounts flow** (Phase 2), **reference data** (Phase 3), **student input** (Phase 4), **analysis** (Phase 5), and the **client pages** (Phase 6). Flows 1-4 below start from API requests directly, since that's how a developer or a test checks them. Flow 5 covers the same ground from the student's point of view: what they see and click on the website, and which of Flows 1-4's API calls each screen makes.
+Describes the live flows of FurtherXpert. That's the **accounts flow** (Phase 2), **reference data** (Phase 3), **student input** (Phase 4), **analysis** (Phase 5), the **client pages** (Phase 6), and the **AI summary** (Phase 7). Flows 1-4 and 6 below start from API requests directly, since that's how a developer or a test checks them. Flow 5 covers the same ground from the student's point of view: what they see and click on the website, and which of the other flows' API calls each screen makes.
 
 ## Trigger
 
@@ -257,8 +257,8 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 ### 6. My Results page
 
 **Page:** `pages/MyResults.jsx`.
-**What it does:** the main results screen. Shows both radar charts (subject-group scores and interest-area scores) via the shared `components/RadarChartCard.jsx`, the Best Fit program list with sweet-spot / likely-to-excel / likely-to-love badges, and an eligibility badge with reasons for each program, via `components/EligibilityBadge.jsx`.
-**Calls:** `GET /me/analysis` (Flow 4 step 1).
+**What it does:** the main results screen. Shows the AI summary via `components/AISummaryCard.jsx` (Phase 7, Flow 6), both radar charts (subject-group scores and interest-area scores) via the shared `components/RadarChartCard.jsx`, the Best Fit program list with sweet-spot / likely-to-excel / likely-to-love badges, and an eligibility badge with reasons for each program, via `components/EligibilityBadge.jsx`.
+**Calls:** `GET /me/analysis` (Flow 4 step 1) for the charts and Best Fit, plus its own independent `GET /me/analysis/summary` call (Flow 6) for the AI summary -- the two calls run in parallel, not one after the other, so a slow or failed summary never delays the charts.
 **Accessibility fallback:** every radar chart also renders a real `<table>` of the same numbers inside a collapsed `<details>` element (not hidden with `display: none`), so a screen reader or a student who can't read the chart visually still gets the same information. This meets **WCAG AA** (Web Content Accessibility Guidelines, level AA -- a common accessibility standard).
 **Incomplete interest test:** while `interest_test_complete` is `false` (decision `0008`), the interest-area chart and Likely to love area show an empty state telling the student to finish the interest test, instead of a chart that looks real but isn't.
 
@@ -282,6 +282,51 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 **Calls:** `GET /me` on load, `POST /auth/logout` for log out, `DELETE /me` for delete (Flow 1 steps 5-6).
 **Safety check:** deleting the account needs 2 steps -- ticking a confirmation checkbox before the delete button is enabled -- so a stray click can't erase an account by accident. The backend still does the real work: cascading the delete to `spm_results`, `interest_answers`, and `analysis` (Flow 3 step 4, Flow 4's cache note).
 
+## Flow 6: AI summary
+
+The AI summary is a short, plain-English paragraph describing a student's own scores, written by GPT-5 (OpenAI's model). It's personal in the sense that it's about one student, but the data sent to GPT-5 is deliberately stripped down first -- see the privacy boundary below. Like Flow 4, it needs a login and only ever touches the logged-in student's own rows.
+
+### 1. Get your summary
+
+**Input:** `GET /me/analysis/summary`.
+**Actions:**
+1. Run `GET /me/analysis` (Flow 4 step 1) first, cached or fresh as usual. This is how the route gets both its "is there enough data" check and the exact scores the summary is built from -- it never queries the student's grades or interest answers itself.
+2. **Not-enough-data check:** if the interest test isn't finished yet (`interest_test_complete` is `false`, decision `0008`) or the student has saved no SPM results yet (empty `subject_groups`), stop here. No call to GPT-5 is made.
+3. **Cache check:** if the student's `analysis` row already has a saved `summary`, return it as-is -- skip every step below, the same cache-first pattern as Flow 4 step 1.
+4. **Build the AI request:** take only the interest-area names + scores and subject-group names + scores from the just-computed analysis, and send **only** those to GPT-5 (`backend/app/services/ai_summary.py`). See "Privacy boundary" below for exactly what this excludes.
+5. **Call GPT-5** with a 6-second hard timeout and no automatic retries (so one slow attempt can't quietly turn into several).
+6. **Enforce the word limit in code**, not just by asking the model nicely: the reply is cut to 120 words or fewer, preferring to cut at the end of a full sentence rather than mid-sentence. This exists because a live check against the real OpenAI API once got a 122-word reply back despite the prompt asking for 120 words or fewer (decision `0013`).
+7. Save the trimmed summary text onto the student's existing `analysis` row (the same row Flow 4 caches charts in), and return it.
+
+**Output:** `200` with one of 3 states:
+- `{"status": "not_enough_data", "summary": null, "message": "..."}` -- the interest test isn't finished, no SPM results are saved, or both. `message` says which.
+- `{"status": "ok", "summary": "...", "message": null}` -- a summary is ready, cached or freshly generated.
+- `{"status": "unavailable", "summary": null, "message": "Summary unavailable right now. Please try again later."}` -- GPT-5 failed, timed out, or no API key is configured. The real error is never shown to the student.
+
+**On failure:** this route **never returns a `500`**. Any problem calling GPT-5 (missing/placeholder API key, timeout, or any other OpenAI error) is caught and turned into the `"unavailable"` state instead -- see "Watch out" below.
+
+### 2. Privacy boundary: what does and doesn't reach GPT-5
+
+**What's sent:** only interest-area names + scores (for example "Science & Technology: 62%") and subject-group names + scores (for example "Sciences: 78%") -- the same numbers already shown on the student's own charts.
+
+**What's never sent:** email, race, citizenship, raw SPM grades (letters like `A+`), the student's user id, name, or any program/eligibility data. The system prompt also tells GPT-5 it has none of this and must never invent or assume it -- for example, it must never name a specific program or say the student is "eligible" for anything, since it has no eligibility data at all.
+
+**Tone:** GPT-5 only receives the student's **top 3 subject groups** and **top 3 non-zero interest areas**, and the prompt asks for a warm, supportive summary. So it can't list what the student isn't into (decision `0014`). The charts still show every score.
+
+> **Watch out:** this isn't just a stated intent -- it's checked by an automated test (`backend/tests/test_ai_summary.py`) that inspects the *exact* outgoing request kwargs sent to the (mocked) OpenAI client, not just the code that builds them. See decision `0010`.
+
+### 3. Caching and invalidation: shares Flow 4's cache, for free
+
+The summary is **not** a separate cache. It's 2 new nullable columns (`summary`, `summary_computed_at`) on the same per-student `analysis` row Flow 4 already caches charts in (decision `0011`).
+
+That means the summary automatically inherits Flow 4's existing cache rule (decision `0006`): `PUT /me/results` and `PUT /me/interest-answers` (Flow 3) both delete the student's whole `analysis` row -- charts **and** summary together -- on every successful save. So the very next `GET /me/analysis` recomputes fresh charts, and the very next `GET /me/analysis/summary` after that always generates a fresh summary from the new scores. There's no separate invalidation logic to keep in sync with Flow 4's.
+
+> **Watch out:** deleting a student's account (Flow 1's `DELETE /me`) removes the `analysis` row, summary included, the same `ON DELETE CASCADE` way Flow 4 already describes.
+
+### 4. Loads separately from the charts
+
+`GET /me/analysis` (charts, Best Fit, eligibility) and `GET /me/analysis/summary` (this flow) are 2 separate API calls. The client (`components/AISummaryCard.jsx`, Flow 5 step 6) fires both at once when My Results loads, instead of waiting for the charts to finish first. So a slow GPT-5 reply (up to the 6-second timeout, plus a little overhead) never delays the charts appearing, and a failed summary never breaks the charts -- this is PRD T7 acceptance criterion 7 ("separately, so charts never wait for it") and criterion 5 ("if the AI fails, the charts and Best Fit still show"), both directly.
+
 ## Error States
 
 | Error | Cause | Handling |
@@ -295,6 +340,7 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 | `400` Bad SPM result save | `PUT /me/results` with a bad grade, a duplicate subject, a missing `BM`/`SJ` row, or an unknown subject code | The client shows the field error and doesn't save |
 | `400` Bad interest-answer save | `PUT /me/interest-answers` with a duplicate question id, an unknown question/option id, or an option that doesn't match its question | The client shows the field error and doesn't save |
 | `500` Analysis can't be computed | `GET /me/analysis` when the current session has no `general_requirements` row for the student's category -- a reference-data gap, not something the student did wrong | Not caught as a friendly error yet: it surfaces as a generic server error. The client should show a generic "something went wrong, try again later" message. A developer should treat this as a sign the session's data load is incomplete |
+| `200` with `status: "unavailable"` | `GET /me/analysis/summary` when GPT-5 times out (6 seconds), errors, or `OPENAI_API_KEY` is missing/placeholder | Never a `500` (Flow 6 step 1). The client shows "Summary unavailable right now." The charts from `GET /me/analysis` are unaffected either way |
 
 ## Defaults
 
@@ -309,6 +355,9 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 | Allowed websites (CORS) | only `FRONTEND_ORIGIN` |
 | Importer pause between requests | 1 second (`REQUEST_DELAY_SECONDS`) |
 | Importer retries on a failed request | up to 4, waiting longer each time |
+| AI summary request timeout | 6 seconds (`REQUEST_TIMEOUT_SECONDS`, decision `0012`) |
+| AI summary request retries | 0 -- never retried automatically (decision `0012`) |
+| AI summary word limit | 120 words, enforced in code (`MAX_SUMMARY_WORDS`, decision `0013`) |
 
 ## Behavioral Constraints
 
@@ -322,12 +371,15 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 - `GET /me/analysis`'s interest-area chart, Likely to love, and any interest-driven sweet spot are only ever computed once all 20 interest-test questions are answered (decision `0008`); until then they're forced to 0/empty regardless of how many (or which) questions have been answered so far.
 - `PUT /me/results` and `PUT /me/interest-answers` both delete the student's cached `analysis` row on every successful save, unconditionally -- there's no check for whether the save actually changed anything (decision `0006`).
 - `GET /me/analysis` only ever computes for, caches, and returns the logged-in student's own data -- the same access-token scoping as every other `/me` route.
+- `GET /me/analysis/summary` sends GPT-5 only interest-area and subject-group names + scores -- never email, race, citizenship, raw grades, or a user id (decision `0010`). It never returns a `500`: any AI failure becomes `status: "unavailable"` instead.
+- `GET /me/analysis/summary` shares `GET /me/analysis`'s cached `analysis` row and its invalidation rule (decision `0006`, decision `0011`) -- there's no separate cache or separate invalidation path for the summary.
+- The AI summary is never computed until the interest test is fully (20/20) answered and at least one SPM result is saved -- the same "enough data" bar `GET /me/analysis`'s charts already use.
 
 ## Related Documents
 
 | Document | Type | Relationship |
 |---|---|---|
-| `docs/prd/furtherxpert-prd.md` | Intent | Product goals these flows fulfil (T1, T2, T3, T4, T5, T6) |
+| `docs/prd/furtherxpert-prd.md` | Intent | Product goals these flows fulfil (T1, T2, T3, T4, T5, T6, T7) |
 | `docs/plan/furtherxpert-plan.md` | Plan | How the flows were planned |
 | `docs/reference/folder-structure.md` | Reference | Where each file of these flows lives |
 | `docs/decisions/NNNN-*.md` | Decision log | Deviations from the plan |

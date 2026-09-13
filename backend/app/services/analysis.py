@@ -28,6 +28,7 @@ from app.models.spm_result import SPMResult
 from app.models.subject import Subject, SubjectGroup
 from app.models.university import University
 from app.models.user import User
+from app.services import ai_summary
 from app.services.eligibility import evaluate_eligibility
 from app.services.reference import _current_session
 from app.services.scoring import (
@@ -209,3 +210,64 @@ def get_analysis(db: DbSession, user: User) -> dict:
     db.commit()
 
     return result
+
+
+def get_analysis_summary(db: DbSession, user: User) -> dict:
+    """`GET /me/analysis/summary` (Phase 7, PRD T4, T7): the AI summary of
+    the student's own charts, cached alongside the charts on the same
+    `analysis` row.
+
+    Reuses `get_analysis` (AI-free, unchanged) both to gate on "enough
+    data" and to read the exact area/group scores the summary is built
+    from -- so this function never queries grades/answers itself, and can
+    never see anything `get_analysis` wouldn't already expose to the
+    student. Never raises for an AI failure: a missing/placeholder key, a
+    timeout, or any other OpenAI error all become the `"unavailable"`
+    state (proj-auth-security skill Section 5: "an AI call failure returns
+    summary: null ... it never breaks /me/analysis"), so this route can
+    never 500 because of the AI.
+    """
+    analysis_result = get_analysis(db, user)
+
+    # "Not enough data" (plan Phase 7 Check): the interest test isn't
+    # finished (decision 0008), or no SPM results are saved yet. An empty
+    # `subject_groups` list is exactly "no SPM results saved" -- every
+    # group with a taken subject would otherwise appear (see
+    # `scoring.subject_group_scores`), and BM+SJ are required on every
+    # save, so at least one group is always present once any results exist.
+    interest_incomplete = not analysis_result["interest_test_complete"]
+    no_results = not analysis_result["subject_groups"]
+    if interest_incomplete or no_results:
+        if interest_incomplete and no_results:
+            message = "Add your SPM results and finish the interest test to get an AI summary."
+        elif interest_incomplete:
+            message = "Finish the interest test to get an AI summary."
+        else:
+            message = "Add your SPM results to get an AI summary."
+        return {"status": "not_enough_data", "summary": None, "message": message}
+
+    cached = db.execute(select(Analysis).where(Analysis.user_id == user.id)).scalar_one_or_none()
+    if cached is not None and cached.summary is not None:
+        return {"status": "ok", "summary": cached.summary, "message": None}
+
+    # Privacy boundary (PRD T4, proj-auth-security skill Section 5): only
+    # area/group names + scores cross into ai_summary.generate_summary --
+    # never email, race, citizenship, raw grades, or program data.
+    area_scores = [{"name": a["area"], "score": a["score"]} for a in analysis_result["interest_areas"]]
+    group_scores = [{"name": g["name"], "score": g["score"]} for g in analysis_result["subject_groups"]]
+
+    try:
+        summary_text = ai_summary.generate_summary(area_scores, group_scores)
+    except ai_summary.AISummaryError:
+        return {
+            "status": "unavailable",
+            "summary": None,
+            "message": "Summary unavailable right now. Please try again later.",
+        }
+
+    if cached is not None:
+        cached.summary = summary_text
+        cached.summary_computed_at = datetime.now(timezone.utc)
+        db.commit()
+
+    return {"status": "ok", "summary": summary_text, "message": None}

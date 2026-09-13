@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** the build order for FurtherXpert, in 7 phases.
 > - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** Phase 1 (foundation), Phase 2 (accounts), Phase 3 (reference data), Phase 4 (student input), Phase 5 (rules engine), and Phase 6 (client pages) are all shipped. Phase 7 (AI summary) is next.
+> - **Now:** all 7 phases are shipped -- foundation, accounts, reference data, student input, rules engine, client pages, and Phase 7 (AI summary). The first release is fully built.
 > - **Where the details live:** `docs/prd/furtherxpert-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
@@ -98,7 +98,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 
 | PRD | Module | Status | Notes |
 |---|---|---|---|
-| `docs/prd/furtherxpert-prd.md` (T4) | `backend/app/services/`, `client/src/` | draft | GPT-5 gets scores only |
+| `docs/prd/furtherxpert-prd.md` (T4) | `backend/app/services/`, `client/src/` | shipped | Confirmed live 2026-09-14: a throwaway account got a real `GET /me/analysis/summary` reply from GPT-5 in ~6.0 seconds (acceptance criterion 7), well under the 10-second budget; the account was then deleted. 126 backend tests pass (up from 116), including a payload-privacy test (the outgoing OpenAI request carries no email/race/citizenship/grades/user id), a forced-AI-failure test showing charts still return via `/me/analysis` while the summary route returns a friendly `unavailable` state (acceptance criterion 5), a timeout-path test, cache-hit/cache-invalidation tests, and a cross-user isolation test. `ai_summary.py` sends only interest-area and subject-group names + scores to GPT-5, with a 6-second hard timeout and no retries. The live check found the prompt-only "120 words or fewer" instruction wasn't reliable on its own (one reply came back at 122 words), so deterministic code-level truncation (`_enforce_word_limit`) was added as the real guarantee -- see decision `0013`. `npm run build` passes |
 
 ## Cross-Cutting Concerns
 
@@ -106,16 +106,16 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 |---|---|---|---|
 | Docker setup | Phase 1 | Phase 3 | Running live: db + backend + client |
 | Login and access control (JWT) | Phase 2 | Phase 6 | Full stack done: the backend guards every account, student-input, and analysis route with a JWT (JSON Web Token, a signed login pass), scoped to the caller only. The client (`client/src/context/AuthContext.jsx`) keeps the access token in memory only (never saved to disk), refreshes it silently on page load, and retries a failed request once via refresh before sending the student to Login |
-| Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4. Confirmed live 2026-09-12: `DELETE /me` cascades to `spm_results` and `interest_answers` too, not just the account row |
+| Privacy (PDPA 2010) | Phase 2 | Phase 7 | Rules written in PRD T4. Confirmed live 2026-09-12: `DELETE /me` cascades to `spm_results` and `interest_answers` too, not just the account row. Phase 7 adds a second privacy boundary: `GET /me/analysis/summary` sends OpenAI only interest-area and subject-group names + scores -- never email, race, citizenship, raw grades, a user id, or program/eligibility data (decision `0010`), checked by an automated test that inspects the real outgoing request payload |
 | Database migrations (Alembic) | Phase 1 | Phase 5 | 6 migrations: the `users` table, the reference-data tables, the sesi 2026/2027 data load, the student-input tables (`spm_results`, `interest_questions`, `interest_options`, `interest_answers`), the approved interest-test seed, and the new `analysis` cache table (one row per user, `ON DELETE CASCADE` to `users`). Both data migrations still replace their own rows on each re-run, leaving everything else untouched |
-| Automated tests | Phase 1 | Phase 5 | 116 backend tests pass (health + accounts + importer + reference routes + student input + scoring + eligibility + analysis + golden student tests), on a separate test database. Phase 6 added no new backend test file, but extended existing ones for the interest-test partial-save/completeness change (decision `0008`); the client's checks so far are the `npm run build` pass and a manual API-level journey walk-through, not an automated test suite |
+| Automated tests | Phase 1 | Phase 7 | 126 backend tests pass (health + accounts + importer + reference routes + student input + scoring + eligibility + analysis + golden student tests + the AI summary route), on a separate test database. Phase 6 added no new backend test file, but extended existing ones for the interest-test partial-save/completeness change (decision `0008`); Phase 7 added `backend/tests/test_ai_summary.py` (10 tests), which mocks the OpenAI client so no test makes a real network call. The client's checks so far are the `npm run build` pass and a manual API-level journey walk-through, not an automated test suite |
 | Rules engine (scoring, eligibility, caching) | Phase 5 | Phase 5 | `backend/app/services/scoring.py` and `eligibility.py` are pure functions (no DB); `analysis.py` loads a student's data, calls them, and caches the result in `analysis`. `PUT /me/results` and `PUT /me/interest-answers` invalidate that cache unconditionally on every successful save, so `GET /me/analysis` never serves stale numbers |
 
 ## PRD Registry
 
 | PRD | Phase | Module | Status |
 |---|---|---|---|
-| `docs/prd/furtherxpert-prd.md` (plan: `docs/plan/furtherxpert-plan.md`) | 1–7 | `backend/`, `client/` | in-progress |
+| `docs/prd/furtherxpert-prd.md` (plan: `docs/plan/furtherxpert-plan.md`) | 1–7 | `backend/`, `client/` | shipped |
 
 ## Prioritization Log
 

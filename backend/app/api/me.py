@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.user import User
-from app.schemas.analysis import AnalysisOut
+from app.schemas.analysis import AnalysisOut, AnalysisSummaryOut
 from app.schemas.interest_test import InterestAnswerIn, InterestAnswerOut, InterestAnswersProgressOut
 from app.schemas.spm_result import SPMResultIn, SPMResultOut
 from app.schemas.user import UserPublic
@@ -94,3 +94,15 @@ def read_my_analysis(
     db: Session = Depends(get_db),
 ) -> dict:
     return analysis_service.get_analysis(db, current_user)
+
+
+@router.get("/me/analysis/summary", response_model=AnalysisSummaryOut)
+def read_my_analysis_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    # A separate call from GET /me/analysis on purpose (PRD T7 acceptance
+    # criterion 7): the AI is allowed to be slow or to fail without ever
+    # blocking or breaking the charts. See
+    # app/services/analysis.py:get_analysis_summary for why this never 500s.
+    return analysis_service.get_analysis_summary(db, current_user)
