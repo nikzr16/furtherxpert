@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import RadarChartCard from '../components/RadarChartCard'
 import { ReasonList, VerdictPill } from '../components/EligibilityBadge'
 import AISummaryCard from '../components/AISummaryCard'
+import WhyThisDiploma from '../components/WhyThisDiploma'
 import { Alert, Badge, Icon, PageHeader, Spinner } from '../components/ui'
 import { displayProgram } from '../programName'
 import { SUBJECT_GROUPS } from '../constants'
@@ -206,6 +207,7 @@ export default function MyResults() {
                                 <VerdictPill verdict={program.verdict} />
                               </div>
                               <ReasonList reasons={program.reasons} />
+                              <WhyThisDiploma why={program.why} />
                             </li>
                           ))}
                         </ul>

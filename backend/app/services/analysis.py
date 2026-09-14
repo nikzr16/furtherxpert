@@ -29,7 +29,8 @@ from app.models.subject import Subject, SubjectGroup
 from app.models.university import University
 from app.models.user import User
 from app.services import ai_summary
-from app.services.eligibility import evaluate_eligibility
+from app.services.eligibility import evaluate_eligibility, find_matching
+from app.services.explanations import explain_program
 from app.services.reference import _current_session
 from app.services.scoring import (
     excel_scores,
@@ -58,13 +59,18 @@ class MissingGeneralRequirementsError(Exception):
         super().__init__(f"No general_requirements row for session {session_id}, category {category!r}")
 
 
-def _program_dict(program: Program, university: University, verdict_result: dict) -> dict:
+def _program_dict(program: Program, university: University, verdict_result: dict, program_rules: dict) -> dict:
+    # `nec_code`, `nec_name` and `program_rules` are internal: they feed the
+    # "Why this diploma?" explanation and are not returned on their own.
     return {
         "code": program.code,
         "name": program.name,
         "university": university.name,
         "verdict": verdict_result["verdict"],
         "reasons": verdict_result["reasons"],
+        "nec_code": program.nec_code,
+        "nec_name": program.nec_name,
+        "program_rules": program_rules,
     }
 
 
@@ -161,7 +167,9 @@ def get_analysis(db: DbSession, user: User) -> dict:
         verdict_result = evaluate_eligibility(
             grades, general.rules, requirement.rules, is_citizen=user.is_citizen, is_bumiputera=is_bumiputera
         )
-        programs_by_area.setdefault(area, []).append(_program_dict(program, university, verdict_result))
+        programs_by_area.setdefault(area, []).append(
+            _program_dict(program, university, verdict_result, requirement.rules)
+        )
 
     # --- j. Scoring (pure functions from scoring.py) ---------------------------------------
     group_scores = subject_group_scores(grades, subject_group_of)
@@ -186,13 +194,59 @@ def get_analysis(db: DbSession, user: User) -> dict:
             seen_areas.add(name)
             best_fit_area_names.append(name)
 
-    best_fit = [
-        {
-            "area": area_name,
-            "programs": select_best_fit(programs_by_area.get(area_name, []), limit=3),
-        }
-        for area_name in best_fit_area_names
-    ]
+    # --- k2. "Why this diploma?" for each shown program (result explanations PRD) --------
+    subject_names = dict(db.execute(select(Subject.code, Subject.name_ms)).all())
+    excel_rank = {name: rank for rank, (name, _) in enumerate(excel_top3, start=1)}
+    love_rank = {name: rank for rank, (name, _) in enumerate(love_top3, start=1)}
+
+    best_fit = []
+    for area_name in best_fit_area_names:
+        candidates = programs_by_area.get(area_name, [])
+        shown = select_best_fit(candidates, limit=3)
+        total = sum(1 for p in candidates if p["verdict"] in ("Eligible", "Conditional"))
+        excel_why = (
+            {
+                "rank": excel_rank[area_name],
+                "score": excel_scores_[area_name],
+                "groups": [
+                    (group_name_of[code], group_scores[code])
+                    for code in area_subject_groups[area_name]
+                    if code in group_scores
+                ],
+            }
+            if area_name in excel_rank
+            else None
+        )
+        love_why = (
+            {
+                "rank": love_rank[area_name],
+                "score": love_scores[area_name],
+                "picks": picks_by_area.get(area_name, 0),
+                "offered": max_picks_by_area[area_name],
+            }
+            if area_name in love_rank
+            else None
+        )
+        programs = []
+        for position, program in enumerate(shown, start=1):
+            why = explain_program(
+                program=program,
+                area=area_name,
+                grades=grades,
+                subject_names=subject_names,
+                matching=find_matching(general.rules, program["program_rules"], grades),
+                bumiputera_only=bool(
+                    general.rules.get("bumiputera_only") or program["program_rules"].get("bumiputera_only")
+                ),
+                excel=excel_why,
+                love=love_why,
+                position=position,
+                total=total,
+            )
+            programs.append(
+                {key: program[key] for key in ("code", "name", "university", "verdict", "reasons")} | {"why": why}
+            )
+        best_fit.append({"area": area_name, "programs": programs})
 
     # --- l/m. Round at the API edge, cache, return -----------------------------------------
     computed_at = datetime.now(timezone.utc)

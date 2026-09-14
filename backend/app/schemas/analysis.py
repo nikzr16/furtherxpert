@@ -24,12 +24,28 @@ class InterestAreaScore(BaseModel):
     score: float
 
 
+class RuleSection(BaseModel):
+    title: str
+    lines: list[str]
+
+
+class ProgramWhy(BaseModel):
+    """"Why this diploma?" (result explanations PRD T2): plain-words sentences
+    built in `app/services/explanations.py`. The page only displays them."""
+
+    match: list[str]
+    rules: list[RuleSection]
+    still_needed: list[str]
+    position: str
+
+
 class BestFitProgram(BaseModel):
     code: str
     name: str
     university: str
     verdict: str
     reasons: list[str]
+    why: ProgramWhy
 
 
 class BestFitArea(BaseModel):

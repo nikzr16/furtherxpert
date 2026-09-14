@@ -171,6 +171,94 @@ def _diagnose(node: dict, grades: dict[str, str]) -> list[str]:
     raise ValueError(f"Unknown rule-tree node: {node!r}")  # pragma: no cover (unreachable via _node_type)
 
 
+def _best_first(subjects: list[str], grades: dict[str, str]) -> list[str]:
+    """Best grade first, then subject code: a fixed order, so the same grades
+    always give the same matching (Python's set order is not stable between
+    runs)."""
+    return sorted(subjects, key=lambda s: (-GRADE_POINTS[grades[s]], s))
+
+
+def _choices(
+    node: dict, available: frozenset[str], grades: dict[str, str]
+) -> Iterator[tuple[frozenset[str], list[tuple[dict, list[str]]]]]:
+    """Like `_ways`, but also yields which subjects were used, as
+    (leaf rule, subjects) parts. An `any` node yields the parts of the branch
+    it took; a nested `all` yields its children's parts in order."""
+    node_type = _node_type(node)
+
+    if node_type == "subject":
+        subject = node["subject"]
+        if subject in available and grade_meets(grades[subject], node["min"]):
+            yield available - {subject}, [(node, [subject])]
+        return
+
+    if node_type in ("one_of", "uncounted"):
+        if node_type == "one_of":
+            pool = [s for s in node["one_of"] if s in available]
+            count = node.get("count", 1)
+        else:
+            pool = list(available)
+            count = node["uncounted"]
+        qualifying = _best_first([s for s in pool if grade_meets(grades[s], node["min"])], grades)
+        for combo in combinations(qualifying, count):
+            yield available - set(combo), [(node, list(combo))]
+        return
+
+    if node_type == "any":
+        for child in node["any"]:
+            yield from _choices(child, available, grades)
+        return
+
+    yield from _choices_all(node["all"], available, grades)
+
+
+def _choices_all(
+    children: list[dict], available: frozenset[str], grades: dict[str, str]
+) -> Iterator[tuple[frozenset[str], list[tuple[dict, list[str]]]]]:
+    if not children:
+        yield available, []
+        return
+    first, *rest = children
+    for after_first, parts in _choices(first, available, grades):
+        for after_rest, rest_parts in _choices_all(rest, after_first, grades):
+            yield after_rest, parts + rest_parts
+
+
+def find_matching(general_rules: dict, program_rules: dict, grades: dict[str, str]) -> list[dict] | None:
+    """One valid way the student's grades meet syarat am + syarat khas, for
+    "Why this diploma?" (result explanations plan, Processing Flow A).
+
+    Uses the same backtracking and the same "each subject counts once" rule as
+    `evaluate_eligibility`, so it returns a matching exactly when the grade
+    tree is satisfiable. For readability and stability, named-subject rules are
+    tried before "N more subjects" (`uncounted`) rules, and candidates go best
+    grade first. The order changes WHICH valid matching is found, never
+    WHETHER one exists.
+
+    Returns one entry per top-level rule, in the original order (syarat am
+    first): `{"side": "general" | "program", "rule": node, "parts":
+    [(leaf rule, [subject codes])]}`. Returns `None` if nothing works.
+    """
+    entries = [("general", node) for node in general_rules.get("all", [])] + [
+        ("program", node) for node in program_rules.get("all", [])
+    ]
+    order = sorted(range(len(entries)), key=lambda i: ("uncounted" in entries[i][1], i))
+
+    def search(position: int, available: frozenset[str]) -> Iterator[dict[int, list]]:
+        if position == len(order):
+            yield {}
+            return
+        index = order[position]
+        for rest, parts in _choices(entries[index][1], available, grades):
+            for found in search(position + 1, rest):
+                yield {index: parts, **found}
+
+    found = next(search(0, frozenset(grades)), None)
+    if found is None:
+        return None
+    return [{"side": side, "rule": node, "parts": found[i]} for i, (side, node) in enumerate(entries)]
+
+
 def _dedupe(reasons: list[str]) -> list[str]:
     seen: set[str] = set()
     deduped: list[str] = []

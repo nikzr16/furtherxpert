@@ -26,7 +26,8 @@ from sqlalchemy import select
 
 from app.models.interest_test import InterestQuestion, InterestTestSet, InterestTestSetQuestion
 from app.services.analysis import BUMIPUTERA_RACES
-from app.services.eligibility import evaluate_eligibility
+from app.services.eligibility import evaluate_eligibility, find_matching
+from app.services.explanations import explain_program
 
 FIXED_SET_SIZE = 40
 GOLDEN_DIR = Path(__file__).parent
@@ -221,6 +222,150 @@ def test_daniel(client, make_register_payload, db_session):
 # alphabetically. Instead: fetch the program's `requirements` /
 # `general_requirements` via `GET /programs/{code}`, pick the category-A row,
 # and call `evaluate_eligibility` directly.
+
+
+# --- "Why this diploma?" (result explanations PRD; plan Step 10.1 task 7) ------
+#
+# Expected lines are worked out by hand from each program's real category-A
+# rules (via `GET /programs/{code}`) and the student's grades, using the plan's
+# fixed order: named-subject rules first, "N more subjects" rules last, and
+# candidates best grade first, then subject code.
+
+AMIR_SCIENCE_TECH_AREA_LINES = [
+    # Excel: mean(Mathematics 100, Sciences mean(FZ 100, KM 88.9, BL 88.9) = 92.6,
+    # Technical & ICT 100) = 97.5. Love: 9 picks / 18 offered in the fixed set = 50.
+    "Science & Technology is #1 in what you're likely to excel in, at 97.5%, "
+    "from your Mathematics (100%), Sciences (92.6%) and Technical & ICT (100%) grades.",
+    "Science & Technology is #1 in what you're likely to love, at 50%: "
+    "you picked a Science & Technology answer in 9 of the 18 questions that offered one.",
+    "That makes it a Sweet spot: it's in your top 3 for both what you're likely to excel in "
+    "and what you're likely to love.",
+]
+
+
+def _subject_names(client) -> dict[str, str]:
+    return {s["code"]: s["name_ms"] for s in client.get("/subjects").json()}
+
+
+def _explain_real_program(client, code: str, grades: dict[str, str], **context) -> dict:
+    program = client.get(f"/programs/{code}").json()
+    general_rules, program_rules = _category_a_rules(program)
+    return explain_program(
+        program={"nec_code": program["nec_code"], "nec_name": program["nec_name"], **context.pop("verdict")},
+        area=context.pop("area"),
+        grades=grades,
+        subject_names=_subject_names(client),
+        matching=find_matching(general_rules, program_rules, grades),
+        bumiputera_only=bool(general_rules.get("bumiputera_only") or program_rules.get("bumiputera_only")),
+        **context,
+    )
+
+
+def test_why_amir_ue4481001_lists_every_rule_with_the_grade_that_meets_it(client):
+    why = _explain_real_program(
+        client,
+        "UE4481001",
+        _grades_of("amir"),
+        verdict={"verdict": "Eligible", "reasons": []},
+        area="Science & Technology",
+        excel=None,
+        love=None,
+        position=1,
+        total=1,
+    )
+    # Named rules: BM, SJ, BI, MT, then "1 of 15 listed" -> best of MTT/FZ/KM/BL/SK
+    # = A+ FZ, MTT, SK -> FZ by code. General "2 more" from MTT A+, SK A+, BL A,
+    # KM A, EK C -> MTT, SK. Diploma "2 more" from BL A, KM A, EK C -> BL, KM.
+    assert why["rules"] == [
+        {
+            "title": "General UPU rules (syarat am)",
+            "lines": [
+                "Bahasa Melayu — needs C, you have A+",
+                "Sejarah — needs E, you have A",
+                "2 more subjects at C or better — Matematik Tambahan (A+), Sains Komputer (A+)",
+            ],
+        },
+        {
+            "title": "This diploma's rules (syarat khas)",
+            "lines": [
+                "Bahasa Inggeris — needs C, you have A",
+                "Matematik — needs C, you have A+",
+                "At least C in 1 of 15 listed subjects — Fizik (A+)",
+                "2 more subjects at C or better — Biologi (A), Kimia (A)",
+                "Only open to Bumiputera students — you qualify.",
+            ],
+        },
+    ]
+    assert why["match"][0] == "This is a computing diploma: its field of study, Sains Komputer (code 0613), is part of Science & Technology."
+    assert why["still_needed"] == ["Nothing else needed — no interview or test."]
+
+
+def test_why_rahman_ue4213001_is_conditional_with_no_extra_rules(client):
+    why = _explain_real_program(
+        client,
+        "UE4213001",
+        _grades_of("rahman"),
+        verdict={"verdict": "Conditional", "reasons": ["Requires interview/test"]},
+        area="Arts & Design",
+        excel=None,
+        love=None,
+        position=1,
+        total=1,
+    )
+    # "2 more" from BI C, GG C, EK C (all C) -> code order BI, EK.
+    assert why["rules"] == [
+        {
+            "title": "General UPU rules (syarat am)",
+            "lines": [
+                "Bahasa Melayu — needs C, you have C",
+                "Sejarah — needs E, you have D",
+                "2 more subjects at C or better — Bahasa Inggeris (C), Ekonomi (C)",
+            ],
+        },
+        {"title": "This diploma's rules (syarat khas)", "lines": ["No extra subject rules beyond the general ones."]},
+    ]
+    assert why["still_needed"] == ["You'll need to pass an interview or test."]
+
+
+def test_why_is_on_every_best_fit_diploma_and_matches_amirs_scores(client, make_register_payload, db_session):
+    body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["amir"])
+    assert body["best_fit"], "Amir should have Best Fit areas"
+
+    science_tech = next(area for area in body["best_fit"] if area["area"] == "Science & Technology")
+    assert science_tech["programs"], "Amir should have Science & Technology diplomas"
+    for area in body["best_fit"]:
+        for position, program in enumerate(area["programs"], start=1):
+            why = program["why"]
+            assert why["match"][0].endswith(f"is part of {area['area']}.")
+            assert [section["title"] for section in why["rules"]] == [
+                "General UPU rules (syarat am)",
+                "This diploma's rules (syarat khas)",
+            ]
+            assert all(section["lines"] for section in why["rules"])
+            assert why["still_needed"]
+            assert why["position"].startswith(f"{position} of ")
+            assert why["position"].split(" of ")[1].split(" ")[0].isdigit()
+            total = int(why["position"].split(" of ")[1].split(" ")[0])
+            assert total >= len(area["programs"])
+            if program["verdict"] == "Eligible":
+                assert why["still_needed"] == ["Nothing else needed — no interview or test."]
+    for program in science_tech["programs"]:
+        assert program["why"]["match"][1:] == AMIR_SCIENCE_TECH_AREA_LINES
+
+
+def test_why_never_shows_race_or_interest_test_wording(client, make_register_payload, db_session):
+    body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["mei_ling"])
+    whys = json.dumps([p["why"] for area in body["best_fit"] for p in area["programs"]], ensure_ascii=False)
+    assert whys != "[]"
+    assert "Cina" not in whys
+    # No interest test question, and no answer long enough to be recognisable
+    # (very short answers like "Law" could match an area name by chance).
+    bank = json.loads((GOLDEN_DIR.parents[1] / "data" / "interest_test.json").read_text(encoding="utf-8"))
+    for question in bank["questions"]:
+        assert question["text"] not in whys
+        for option_text, _ in question["options"]:
+            if len(option_text) > 20:
+                assert option_text not in whys
 
 
 def _category_a_rules(program: dict) -> tuple[dict, dict]:

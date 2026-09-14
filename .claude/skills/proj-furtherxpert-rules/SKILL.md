@@ -105,6 +105,7 @@ Fixtures: `backend/tests/golden/students.json`. Expected outputs: `backend/tests
 - [ ] No formula lives in the client or in a router.
 - [ ] No unknown grade reaches scoring.
 - [ ] Interest tags are unique per area; normalised by max picks within the student's own set, not the whole 300-question bank.
+- [ ] "Why this diploma?" (Phase 10) uses `eligibility.find_matching` (the checker's own backtracking, each subject once) and the charts' 1-decimal rounding; built by code, never AI; never shows race or interest test questions/answers.
 - [ ] Counts-once holds (a test covers the trap).
 - [ ] Category A/B chosen from SPM year vs `latest_spm_year`.
 - [ ] Bumiputera and citizenship hard stops come before grade checks.

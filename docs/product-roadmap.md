@@ -118,6 +118,15 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 |---|---|---|---|
 | `docs/prd/interest-test-rotation-prd.md` | `backend/data/`, `backend/app/`, `backend/migrations/`, `client/src/` | in-progress | PRD and plan agreed 2026-09-14. Built the same day, not yet committed. **Question bank:** 280 new questions (300 total), every area tagged 133 or 134 times. The product owner handed their review to the assistant (decision `0021`). **Backend:** per-student 40-question sets, `GET /me/interest-test`, `POST /me/interest-test/rotate`, scores from the latest finished set, public `GET /interest-test` removed (decision `0020`). **Page:** "N of 40", Get new questions with confirm, fresh-set note; Home says 40. **Checked:** 152 backend tests pass (up from 126), including golden numbers re-worked by hand; migrations applied to the dev database (300 questions); a live API run with a throwaway account (open, resume, rotate with no repeats, finish, new set keeps results, account deleted); `npm run build` passes; lint shows no new warnings. **Still open:** a by-hand browser check of the Interest Test page at phone and laptop width (needs the product owner to log in), and reviewer sign-off |
 
+### Phase 10: Why this diploma
+
+**Trigger:** the product owner asked for every suggested diploma to explain why it's suggested, and agreed the PRD and plan (2026-09-14).
+**Graduation criteria:** acceptance criteria 1–10 in `docs/prd/result-explanations-prd.md` pass, and steps 10.1–10.3 in `docs/plan/result-explanations-plan.md` are done.
+
+| PRD | Module | Status | Notes |
+|---|---|---|---|
+| `docs/prd/result-explanations-prd.md` | `backend/app/services/`, `backend/app/schemas/`, `client/src/` | in-progress | PRD and plan agreed 2026-09-14. Built the same day, not yet committed. **Backend:** `eligibility.find_matching` (which grade met which rule, same backtracking as the checker), pure `services/explanations.py`, `why` on every Best Fit program, cache-clearing migration `c9e5a1b63d42` (decision `0022`). **Page:** closed-by-default "Why this diploma?" under each program (`WhyThisDiploma.jsx`). **Checked:** 171 backend tests pass (up from 152), including hand-written expected sentences, golden checks for Amir on `UE4481001` and Rahman on `UE4213001`, and an agreement test between `find_matching` and the checker over every real rule tree; golden chart and Best Fit numbers unchanged; a live API run with a throwaway account showed correct explanations on all 10 shown diplomas (account deleted); `npm run build` passes; lint shows no new warnings. **Still open:** a by-hand browser check of My Results at phone and laptop width (needs the product owner to log in), reviewer sign-off. **Found, not fixed here:** some UiTM diplomas are Bumiputera-only at program level but not in their rule data (separate task). Ranking diplomas by fit is listed under "Later" as its own phase |
+
 ## Cross-Cutting Concerns
 
 | Concern | Introduced In | Matured In | Current State |
@@ -136,6 +145,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 | `docs/prd/furtherxpert-prd.md` (plan: `docs/plan/furtherxpert-plan.md`) | 1–7 | `backend/`, `client/` | shipped |
 | `docs/prd/ui-redesign-prd.md` (plan: `docs/plan/ui-redesign-plan.md`) | 8 | `client/` | in-progress |
 | `docs/prd/interest-test-rotation-prd.md` (plan: `docs/plan/interest-test-rotation-plan.md`) | 9 | `backend/`, `client/` | in-progress |
+| `docs/prd/result-explanations-prd.md` (plan: `docs/plan/result-explanations-plan.md`) | 10 | `backend/`, `client/` | in-progress |
 
 ## Prioritization Log
 
@@ -148,6 +158,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 
 ## Later (not in the first release)
 
+- Rank Best Fit diplomas by how well they fit the student, instead of Eligible first then A to Z (the product owner agreed this should be its own phase, 2026-09-14)
 - Admin editing screens
 - Private universities
 - Asasi, Matrikulasi and polytechnic routes

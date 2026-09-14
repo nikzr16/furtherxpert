@@ -59,7 +59,8 @@ furtherxpert/
 │   │       ├── 3916bef04fb3_add_analysis_table.py          creates the `analysis` cache table (Phase 5)
 │   │       ├── 96f63a9f3e5c_add_ai_summary_columns_to_analysis.py adds `summary`/`summary_computed_at` to `analysis` (Phase 7)
 │   │       ├── a7c3e9d41b20_add_interest_test_sets.py      per-student question sets; answers tied to a set (Phase 9)
-│   │       └── b8d4f0a52c31_load_interest_question_bank.py appends questions 21-300 to the bank (Phase 9)
+│   │       ├── b8d4f0a52c31_load_interest_question_bank.py appends questions 21-300 to the bank (Phase 9)
+│   │       └── c9e5a1b63d42_clear_analysis_cache_for_why.py clears cached results so they gain "why" (Phase 10)
 │   ├── data/
 │   │   ├── interest_test.json      the 300-question interest-test bank (1-20 Phase 4, 21-300 Phase 9)
 │   │   └── upu/                    e-Panduan snapshots
@@ -97,7 +98,8 @@ furtherxpert/
 │   │   ├── services/interest_test.py current set (get or create), rotate, merge/upsert answers, invalidates the analysis cache (Phase 4, 5, 9)
 │   │   ├── services/question_sets.py picks a balanced, fresh 40-question set -- pure functions, no DB (Phase 9)
 │   │   ├── services/scoring.py     Chart scoring, Best Fit sort/filter -- pure functions, no DB (Phase 5)
-│   │   ├── services/eligibility.py UPU eligibility checker -- pure functions, no DB (Phase 5)
+│   │   ├── services/eligibility.py UPU eligibility checker -- pure functions, no DB (Phase 5); find_matching for explanations (Phase 10)
+│   │   ├── services/explanations.py "Why this diploma?" sentences -- pure functions, no DB, no AI (Phase 10)
 │   │   ├── services/analysis.py    GET /me/analysis orchestration: loads DB data, calls scoring.py/eligibility.py, caches the result (Phase 5); get_analysis_summary for GET /me/analysis/summary (Phase 7)
 │   │   ├── services/ai_summary.py  builds the privacy-minimal GPT-5 prompt, calls OpenAI with a 6s timeout, enforces the 120-word cap in code (Phase 7)
 │   │   └── importer/               e-Panduan importer (Phase 3)
@@ -118,6 +120,8 @@ furtherxpert/
 │       ├── test_interest_bank.py   data checks on the 300-question bank: numbering, 4 different areas, no duplicates, 133-134 tags per area (Phase 9)
 │       ├── test_question_sets.py   unit tests for services/question_sets.py: size, balance, freshness, fixed seed (Phase 9)
 │       ├── test_interest_sets.py   API tests for sets and rotation: resume, new set after finishing, rotate, scoping, delete cascade (Phase 9)
+│       ├── test_find_matching.py   unit tests for eligibility.find_matching, incl. agreement with the checker over every real rule tree (Phase 10)
+│       ├── test_explanations.py    unit tests for services/explanations.py with hand-written expected sentences (Phase 10)
 │       ├── fixtures/               saved real e-Panduan HTML pages used by the importer tests (Phase 3)
 │       └── golden/                 6 sample-student golden tests, run against the real API + DB (Phase 5)
 │           ├── students.json           each student's SPM results and interest-test picks (hand-derived)
@@ -145,7 +149,8 @@ furtherxpert/
 │       │   ├── ProtectedRoute.jsx  sends a logged-out visitor to Login instead of the page
 │       │   ├── RadarChartCard.jsx  reusable radar chart with name + score spoke labels (decision 0017) + a real <table> text fallback (WCAG AA) + empty states
 │       │   ├── EligibilityBadge.jsx eligibility verdict pill (VerdictPill) and reasons (ReasonList)
-│       │   └── AISummaryCard.jsx   AI summary card; fetches GET /me/analysis/summary independently of the charts (Phase 7)
+│       │   ├── AISummaryCard.jsx   AI summary card; fetches GET /me/analysis/summary independently of the charts (Phase 7)
+│       │   └── WhyThisDiploma.jsx  open/close "Why this diploma?" section under each Best Fit program (Phase 10)
 │       └── pages/
 │           ├── Home.jsx            landing page: headline, example chart, live program counts, how it works (Phase 8)
 │           ├── NotFound.jsx        "Page not found" page for unknown addresses (Phase 8)
@@ -189,14 +194,15 @@ furtherxpert/
 | `backend/app/schemas/reference.py` | Pydantic request/response shapes for the reference-data routes |
 | `backend/app/schemas/spm_result.py` | Pydantic request/response shapes for `GET`/`PUT /me/results`. Validates the grade is one of `SPM_GRADES` |
 | `backend/app/schemas/interest_test.py` | Pydantic request/response shapes for the interest test routes. The public option shape carries no area id or name. `InterestAnswersProgressOut` (Phase 6) is the saved-answers + `complete` shape. `InterestTestSetOut` (Phase 9) is the set shape for `GET /me/interest-test` and the rotate route: `set_id`, questions, answers, `answered`, `total`, `complete`, `has_finished_set` |
-| `backend/app/schemas/analysis.py` | Pydantic response shapes: `AnalysisOut` for `GET /me/analysis` -- both charts, Best Fit, Sweet spot, category, `computed_at`, `interest_test_complete` (Phase 5; `interest_test_complete` added Phase 6, decision `0008`); `AnalysisSummaryOut` for `GET /me/analysis/summary` -- `status` (`not_enough_data`/`ok`/`unavailable`), `summary`, `message` (Phase 7) |
+| `backend/app/schemas/analysis.py` | Pydantic response shapes: `AnalysisOut` for `GET /me/analysis` -- both charts, Best Fit, Sweet spot, category, `computed_at`, `interest_test_complete` (Phase 5; `interest_test_complete` added Phase 6, decision `0008`); each `BestFitProgram` carries `why: ProgramWhy` (`match`, `rules: list[RuleSection]`, `still_needed`, `position`, Phase 10); `AnalysisSummaryOut` for `GET /me/analysis/summary` -- `status` (`not_enough_data`/`ok`/`unavailable`), `summary`, `message` (Phase 7) |
 | `backend/app/services/auth.py` | Sign-up and login business rules: creates the account, checks the password, keeps login timing the same whether the email exists or not |
 | `backend/app/services/reference.py` | Reference-data reads: subjects, universities, and programs (with `area`/`university`/`q` filters), always from the most recently loaded session |
 | `backend/app/services/results.py` | SPM-results read and upsert: validates subject codes against the database, requires Bahasa Melayu (`BM`) and Sejarah (`SJ`) in every save, never deletes a subject the payload leaves out. Also deletes the student's cached `analysis` row on every successful save (Phase 5) |
 | `backend/app/services/interest_test.py` | `get_or_create_current_set` (Phase 9): row-locks the student, resumes an unfinished set or draws a new one. `rotate_set` (Phase 9): discards an unfinished set's answers and draws a new set. `save_answers` (merge/upsert, decision `0008`): only questions in the current set; marks the set finished at 40 answers and deletes older sets' answers. Deletes the student's cached `analysis` row on every successful save (Phase 5). `get_progress` returns the current set's saved answers plus `complete`, for `GET /me/interest-answers`, and never creates a set |
 | `backend/app/services/question_sets.py` | **Pure functions, no DB (Phase 9):** `draw_set` picks 40 questions, each time taking the one whose areas are least represented so far (every area 16–20), from unseen questions first; `is_balanced` checks the range (decision `0020`) |
 | `backend/app/services/scoring.py` | **Pure functions, no DB session, no HTTP, no clock:** grade-to-percent, subject-group scores (Chart 1), interest-area scores (Chart 2), excel scores, top-3-with-tiebreak, Sweet spot, and Best Fit's program sort/filter (Phase 5) |
-| `backend/app/services/eligibility.py` | **Pure functions, no DB session, no HTTP, no clock:** the UPU eligibility checker. Merges syarat am + syarat khas into one rule tree and checks it with backtracking so each subject counts at most once across the whole tree (decision `0005`); returns a verdict (Eligible/Conditional/Not Eligible) with plain-English reasons (Phase 5) |
+| `backend/app/services/eligibility.py` | **Pure functions, no DB session, no HTTP, no clock:** the UPU eligibility checker. Merges syarat am + syarat khas into one rule tree and checks it with backtracking so each subject counts at most once across the whole tree (decision `0005`); returns a verdict (Eligible/Conditional/Not Eligible) with plain-English reasons (Phase 5). `find_matching` (Phase 10) returns one valid way the grades meet the rules -- which subject met which rule -- using the same backtracking, with named-subject rules first, "N more subjects" last, and best grade first, so the result is stable |
+| `backend/app/services/explanations.py` | **Pure functions, no DB, no AI (Phase 10):** `explain_program` builds a Best Fit diploma's `why` -- `match` (field of study, area rank/score and where it came from, Sweet spot), `rules` (syarat am and syarat khas lines with the student's grades), `still_needed`, `position`. `FIELD_WORDS` maps NEC codes to a short field word |
 | `backend/app/services/ai_summary.py` | `generate_summary(area_scores, group_scores)`: the whole privacy boundary between the app and OpenAI (decision `0010`) -- only interest-area and subject-group names + scores are accepted as parameters, never email/race/citizenship/grades/user id. Calls the real `openai` SDK with a 6-second hard timeout and `max_retries=0` (decision `0012`), then deterministically truncates the reply to `MAX_SUMMARY_WORDS` (120) via `_enforce_word_limit` (decision `0013`). Raises `AISummaryError` on any failure -- never swallows one into an empty string (Phase 7) |
 | `backend/app/services/analysis.py` | `GET /me/analysis` orchestration: the one Phase 5 module that touches the DB and the clock. Loads a student's grades/answers/category and the current session's reference data, calls `scoring.py`/`eligibility.py`, builds Best Fit, caches the result in `analysis`. Raises `MissingGeneralRequirementsError` if the session has no syarat am row for the student's category (Phase 5). Gates interest scoring (`interest_areas`, `likely_to_love`) on the student having a fully answered (40/40) set, forcing 0/empty until then (Phase 6, decision `0008`); picks and max picks come from that latest finished set only (Phase 9). `get_analysis_summary` (Phase 7) orchestrates `GET /me/analysis/summary`: reuses `get_analysis` for the "enough data" gate and the scores, checks/updates the cached `summary` column, and calls `ai_summary.generate_summary` -- never raises for an AI failure, always returns the `not_enough_data`/`ok`/`unavailable` shape |
 | `backend/app/importer/epanduan.py` | Sequentially fetches e-Panduan's program lists and rule pages (1 request at a time, paused, retried with backoff), parses them with **selectolax** (decision `0002`), and writes a session snapshot |
@@ -212,6 +218,7 @@ furtherxpert/
 | `backend/migrations/versions/96f63a9f3e5c_add_ai_summary_columns_to_analysis.py` | Seventh migration (Phase 7): adds 2 nullable columns, `summary` (Text) and `summary_computed_at` (DateTime), to the existing `analysis` table. No new table and no rows loaded -- see decision `0011` for why the summary rides on the same cache row instead of a new table |
 | `backend/migrations/versions/a7c3e9d41b20_add_interest_test_sets.py` | Eighth migration (Phase 9): creates `interest_test_sets` and `interest_test_set_questions`, adds `interest_answers.set_id`, and changes its unique rule to (`set_id`, `question_id`). Deletes existing answers (they belong to no set) and every cached `analysis` row |
 | `backend/migrations/versions/b8d4f0a52c31_load_interest_question_bank.py` | Ninth migration (Phase 9): appends every question in `backend/data/interest_test.json` whose `n` isn't in the database yet (questions 21-300), with its options plus "None of the above". Never deletes, so questions 1-20 keep their ids. Safe to re-run |
+| `backend/migrations/versions/c9e5a1b63d42_clear_analysis_cache_for_why.py` | Tenth migration (Phase 10): deletes every cached `analysis` row once, so each student's next `GET /me/analysis` includes `why` on Best Fit programs. No schema change; the downgrade does nothing |
 
 ## Routes
 
@@ -278,6 +285,7 @@ furtherxpert/
 | `client/src/components/ProtectedRoute.jsx` | Wraps a page; sends a logged-out visitor to Login instead of rendering it. Shows `PageLoader` while login is checked (Phase 6) |
 | `client/src/components/RadarChartCard.jsx` | Reusable radar chart (Recharts). Each spoke shows the area name with its score underneath; scale numbers hidden (decision `0017`). Always renders a real `<table>` of the same numbers, hidden from view but read by screen readers (`sr-only`, not `display: none`, decision `0018`), for WCAG AA (Web Content Accessibility Guidelines, level AA) accessibility, plus empty states with a link to the missing step (Phase 6; `variant` excel/love colours and spoke labels added Phase 8) |
 | `client/src/components/EligibilityBadge.jsx` | Shows a program's Eligible/Conditional/Not Eligible verdict with its plain-English reasons. Also exports `VerdictPill` and `ReasonList` separately, used by My Results (Phase 6; split Phase 8) |
+| `client/src/components/WhyThisDiploma.jsx` | Native `<details>` "Why this diploma?" section under each Best Fit program, closed by default. Lays out the backend's `why`: Why it matches you, How you meet the entry rules (syarat am / syarat khas columns), Anything still needed, and the position line. Renders nothing when `why` is missing (Phase 10) |
 | `client/src/components/AISummaryCard.jsx` | Fetches `GET /me/analysis/summary` on its own `useEffect`, independent of `MyResults.jsx`'s chart fetch, so a slow or failed AI call never blocks or delays the charts. Renders loading / `ok` / `not_enough_data` / `unavailable` states (Phase 7) |
 | `client/src/pages/Home.jsx` | Landing page: headline, an example chart labelled "Example result", live program and university counts (from `GET /programs` and `GET /universities`), how it works, features, closing sign-up banner (Phase 8) |
 | `client/src/pages/NotFound.jsx` | "Page not found" page for any unknown address, with links to Home and Explore (Phase 8) |
