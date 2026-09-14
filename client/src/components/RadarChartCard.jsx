@@ -3,8 +3,8 @@ import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, Responsi
 import { Icon } from './ui'
 
 const VARIANTS = {
-  excel: { color: '#4f46e5', icon: 'academicCap', iconBox: 'bg-indigo-50 text-indigo-600', bar: 'bg-indigo-500' },
-  love: { color: '#e11d48', icon: 'heart', iconBox: 'bg-rose-50 text-rose-600', bar: 'bg-rose-500' },
+  excel: { color: '#4f46e5', icon: 'academicCap', iconBox: 'bg-indigo-50 text-indigo-600' },
+  love: { color: '#e11d48', icon: 'heart', iconBox: 'bg-rose-50 text-rose-600' },
 }
 
 const LINE_HEIGHT = 13
@@ -44,10 +44,9 @@ function SpokeLabel({ x, y, cy, textAnchor, payload, scores, color }) {
 
 // A Recharts radar chart plus a real, always-reachable <table> equivalent
 // (PRD T7: "each chart has a text-table version for screen readers",
-// WCAG AA). The table lives inside a native <details> so it's collapsed by
-// default without ever being display:none -- it's still in the page, still
-// reachable by keyboard and by a screen reader's browse mode, and opening it
-// needs no custom JavaScript.
+// WCAG AA). The table is visually hidden with `sr-only` (never display:none),
+// so it stays in the page for screen readers while sighted students read the
+// scores off the spoke labels (decision 0018).
 export default function RadarChartCard({
   title,
   subtitle,
@@ -131,40 +130,23 @@ export default function RadarChartCard({
             </ResponsiveContainer>
           </div>
 
-          <details className="group mt-4 border-t border-slate-100 pt-3">
-            <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg py-1 text-sm font-medium text-slate-600 transition hover:text-slate-900">
-              View as a table
-              <Icon name="chevronDown" className="size-4 transition group-open:rotate-180" />
-            </summary>
-            <table className="mt-3 w-full border-collapse text-sm">
-              <caption className="sr-only">{title}, as a table</caption>
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs tracking-wide text-slate-500 uppercase">
-                  <th scope="col" className="py-2 pr-4 font-medium">
-                    Area
-                  </th>
-                  <th scope="col" className="py-2 text-right font-medium">
-                    {scoreLabel}
-                  </th>
+          <table className="sr-only">
+            <caption>{title}, as a table</caption>
+            <thead>
+              <tr>
+                <th scope="col">Area</th>
+                <th scope="col">{scoreLabel}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.name}>
+                  <td>{row.name}</td>
+                  <td>{row.score}%</td>
                 </tr>
-              </thead>
-              <tbody>
-                {data.map((row) => (
-                  <tr key={row.name} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-4 text-slate-700">{row.name}</td>
-                    <td className="py-2">
-                      <div className="flex items-center justify-end gap-3">
-                        <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 sm:block">
-                          <span className={`block h-full rounded-full ${style.bar}`} style={{ width: `${row.score}%` }} />
-                        </span>
-                        <span className="w-10 text-right font-medium text-slate-900 tabular-nums">{row.score}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
+              ))}
+            </tbody>
+          </table>
         </>
       )}
     </section>

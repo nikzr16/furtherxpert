@@ -117,15 +117,15 @@ Also called: **DoD**, the list that must be fully ticked before the phase counts
 - [x] Lint shows no new warnings. *Checked 2026-09-14 with `npx oxlint src`: 3 warnings, all from code that existed before Phase 8 (`AuthContext.jsx` ×2, the loading reset in `ProgramDetail.jsx`).*
 - [x] Only `client/` files changed. No backend, API or database change. *Checked in the file list of commit `9fe75b1`.*
 - [x] Every page uses the shared pieces. *Checked by reading all 10 page files.*
-- [x] Each chart still renders its text `<table>`. *Checked by reading `RadarChartCard.jsx`. Not yet seen in a browser.*
+- [x] Each chart still renders its text `<table>`. *Checked by reading `RadarChartCard.jsx`, then on 2026-09-14 in the browser's accessibility tree: both "…, as a table" tables are present, hidden from view (decision `0018`).*
 - [x] No untrue claims on the site. The Home chart says "Example result". *Checked by reading every page.*
 
 **Checked in a real browser**
 - [x] Home, Log in, Register, Explore and Program Detail look right at about 700px wide and at 1200px wide. *Checked 2026-09-14 in the in-app browser, with screenshots and page text.*
 - [ ] The same public pages at a 375px phone width.
-- [ ] SPM Results, Interest Test, My Results and Account, at phone and laptop width. *Not checked yet: needs a person to log in.*
-- [ ] Spider chart labels with real data: no scale numbers, nothing cut off or overlapping, at phone and laptop width.
-- [ ] Program names show in title case on My Results. *Seen on Explore and Program Detail; not yet on My Results.*
+- [ ] SPM Results, Interest Test, My Results and Account, at phone and laptop width. *My Results was checked 2026-09-14 at about 700px wide, with real data. It found one bug, fixed the same day: eligibility pills stretched full width. The other 3 pages, and laptop width, are still open.*
+- [ ] Spider chart labels with real data: no scale numbers, nothing cut off or overlapping, at phone and laptop width. *Both charts looked right at about 700px wide on 2026-09-14. 375px and laptop width are still open.*
+- [x] Program names show in title case on My Results. *Checked 2026-09-14 in the browser, for example "Diploma Analisis Pelaburan".*
 - [ ] The 404 page, by visiting an address that doesn't exist.
 - [ ] Keyboard-only walk-through: Tab through each page, and the focus ring is always visible.
 

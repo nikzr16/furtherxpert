@@ -9,7 +9,7 @@ export function VerdictPill({ verdict }) {
   const style = STYLES[verdict] || FALLBACK
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style.pill}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style.pill}`}
     >
       <span className={`size-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
       {verdict}
