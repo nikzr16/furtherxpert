@@ -1,25 +1,44 @@
 const STYLES = {
-  Eligible: 'bg-green-100 text-green-800 border-green-300',
-  Conditional: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  'Not Eligible': 'bg-red-100 text-red-800 border-red-300',
+  Eligible: { pill: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+  Conditional: { pill: 'bg-amber-50 text-amber-800 ring-amber-200', dot: 'bg-amber-500' },
+  'Not Eligible': { pill: 'bg-red-50 text-red-700 ring-red-200', dot: 'bg-red-500' },
+}
+const FALLBACK = { pill: 'bg-slate-100 text-slate-700 ring-slate-200', dot: 'bg-slate-400' }
+
+export function VerdictPill({ verdict }) {
+  const style = STYLES[verdict] || FALLBACK
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style.pill}`}
+    >
+      <span className={`size-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
+      {verdict}
+    </span>
+  )
+}
+
+export function ReasonList({ reasons = [] }) {
+  if (reasons.length === 0) return null
+  return (
+    <ul className="mt-2 space-y-1 text-xs text-slate-500">
+      {reasons.map((reason) => (
+        <li key={reason} className="flex gap-2">
+          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          {reason}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 // Verdict badge + its reasons (PRD T2: "always with reasons"). Best Fit only
 // ever shows Eligible/Conditional programs, but the badge itself supports
 // all three verdicts so it stays correct if that ever changes.
 export default function EligibilityBadge({ verdict, reasons = [] }) {
-  const style = STYLES[verdict] || 'bg-gray-100 text-gray-800 border-gray-300'
-
   return (
     <div>
-      <span className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${style}`}>{verdict}</span>
-      {reasons.length > 0 && (
-        <ul className="mt-1 list-inside list-disc text-xs text-gray-600">
-          {reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-      )}
+      <VerdictPill verdict={verdict} />
+      <ReasonList reasons={reasons} />
     </div>
   )
 }

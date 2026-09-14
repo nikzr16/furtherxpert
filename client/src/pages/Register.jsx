@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerAccount } from '../api'
 import { MIN_PASSWORD_LENGTH, RACES } from '../constants'
+import AuthShell from '../components/AuthShell'
+import { Alert, Icon, Spinner } from '../components/ui'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const EARLIEST_SPM_YEAR = 1970
@@ -64,19 +66,30 @@ export default function Register() {
     }
   }
 
-  return (
-    <main className="mx-auto max-w-md p-6">
-      <h2 className="text-xl font-semibold">Create your account</h2>
+  const inputClass = (field) => `input ${fieldErrors[field] ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : ''}`
 
+  return (
+    <AuthShell
+      title="Create your account"
+      subtitle="It only takes a minute. We ask for the least we need."
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" className="link">
+            Log in
+          </Link>
+        </>
+      }
+    >
       {formError && (
-        <p className="mt-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800" role="alert">
+        <Alert tone="error" className="mb-5">
           {formError}
-        </p>
+        </Alert>
       )}
 
-      <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate>
+      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium">
+          <label htmlFor="email" className="label">
             Email
           </label>
           <input
@@ -84,15 +97,16 @@ export default function Register() {
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded border border-gray-300 p-2 focus:outline focus:outline-2 focus:outline-blue-600"
+            placeholder="you@example.com"
+            className={inputClass('email')}
             value={form.email}
             onChange={(e) => update('email', e.target.value)}
           />
-          {fieldErrors.email && <p className="mt-1 text-sm text-red-700">{fieldErrors.email}</p>}
+          {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium">
+          <label htmlFor="password" className="label">
             Password
           </label>
           <input
@@ -101,81 +115,84 @@ export default function Register() {
             required
             autoComplete="new-password"
             minLength={MIN_PASSWORD_LENGTH}
-            className="mt-1 w-full rounded border border-gray-300 p-2 focus:outline focus:outline-2 focus:outline-blue-600"
+            className={inputClass('password')}
             value={form.password}
             onChange={(e) => update('password', e.target.value)}
           />
-          {fieldErrors.password && <p className="mt-1 text-sm text-red-700">{fieldErrors.password}</p>}
+          {fieldErrors.password ? (
+            <p className="field-error">{fieldErrors.password}</p>
+          ) : (
+            <p className="hint">At least {MIN_PASSWORD_LENGTH} characters.</p>
+          )}
         </div>
 
         <fieldset>
-          <legend className="block text-sm font-medium">Are you a Malaysian citizen?</legend>
-          <div className="mt-1 flex gap-4">
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="is_citizen"
-                checked={form.is_citizen === true}
-                onChange={() => update('is_citizen', true)}
-              />
-              Yes
-            </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="is_citizen"
-                checked={form.is_citizen === false}
-                onChange={() => update('is_citizen', false)}
-              />
-              No
-            </label>
+          <legend className="label">Are you a Malaysian citizen?</legend>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            {[
+              ['Yes', true],
+              ['No', false],
+            ].map(([text, value]) => (
+              <label
+                key={text}
+                className="flex cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 has-checked:border-indigo-600 has-checked:bg-indigo-50 has-checked:text-indigo-700 has-focus-visible:ring-4 has-focus-visible:ring-indigo-500/20"
+              >
+                <input
+                  type="radio"
+                  name="is_citizen"
+                  className="sr-only"
+                  checked={form.is_citizen === value}
+                  onChange={() => update('is_citizen', value)}
+                />
+                {text}
+              </label>
+            ))}
           </div>
         </fieldset>
 
-        <div>
-          <label htmlFor="race" className="block text-sm font-medium">
-            Race
-          </label>
-          <p className="mt-1 text-sm text-gray-600">
-            We only ask this to check which programs are reserved for Bumiputera students (Melayu, Anak Negeri Sabah,
-            Anak Negeri Sarawak, or Orang Asli). It's never used for anything else.
-          </p>
-          <select
-            id="race"
-            className="mt-1 w-full rounded border border-gray-300 p-2 focus:outline focus:outline-2 focus:outline-blue-600"
-            value={form.race}
-            onChange={(e) => update('race', e.target.value)}
-          >
-            {RACES.map((race) => (
-              <option key={race} value={race}>
-                {race}
-              </option>
-            ))}
-          </select>
+        <div className="grid gap-5 sm:grid-cols-[1fr_8rem]">
+          <div>
+            <label htmlFor="race" className="label">
+              Race
+            </label>
+            <select id="race" className="select" value={form.race} onChange={(e) => update('race', e.target.value)}>
+              {RACES.map((race) => (
+                <option key={race} value={race}>
+                  {race}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="spm_year" className="label">
+              SPM year
+            </label>
+            <input
+              id="spm_year"
+              type="number"
+              required
+              min={EARLIEST_SPM_YEAR}
+              max={CURRENT_YEAR}
+              className={inputClass('spm_year')}
+              value={form.spm_year}
+              onChange={(e) => update('spm_year', e.target.value)}
+            />
+          </div>
         </div>
+        {fieldErrors.spm_year && <p className="field-error -mt-3">{fieldErrors.spm_year}</p>}
+
+        <p className="-mt-2 flex gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+          <Icon name="lock" className="size-4 shrink-0 text-slate-400" />
+          We only ask your race to check which programs are reserved for Bumiputera students (Melayu, Anak Negeri
+          Sabah, Anak Negeri Sarawak, or Orang Asli). It's never used for anything else.
+        </p>
 
         <div>
-          <label htmlFor="spm_year" className="block text-sm font-medium">
-            SPM year
-          </label>
-          <input
-            id="spm_year"
-            type="number"
-            required
-            min={EARLIEST_SPM_YEAR}
-            max={CURRENT_YEAR}
-            className="mt-1 w-full rounded border border-gray-300 p-2 focus:outline focus:outline-2 focus:outline-blue-600"
-            value={form.spm_year}
-            onChange={(e) => update('spm_year', e.target.value)}
-          />
-          {fieldErrors.spm_year && <p className="mt-1 text-sm text-red-700">{fieldErrors.spm_year}</p>}
-        </div>
-
-        <div>
-          <label className="flex items-start gap-2 text-sm">
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-slate-600">
             <input
               type="checkbox"
-              className="mt-0.5"
+              className="mt-1 size-4 shrink-0 cursor-pointer rounded"
               checked={form.consent}
               onChange={(e) => update('consent', e.target.checked)}
             />
@@ -184,24 +201,14 @@ export default function Register() {
               eligible programs, and my race only to check Bumiputera-only programs.
             </span>
           </label>
-          {fieldErrors.consent && <p className="mt-1 text-sm text-red-700">{fieldErrors.consent}</p>}
+          {fieldErrors.consent && <p className="field-error">{fieldErrors.consent}</p>}
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800 disabled:opacity-50"
-        >
+        <button type="submit" disabled={submitting} className="btn btn-primary w-full py-3">
+          {submitting && <Spinner className="size-4" />}
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
-
-      <p className="mt-4 text-sm text-gray-600">
-        Already have an account?{' '}
-        <Link to="/login" className="underline hover:no-underline">
-          Log in
-        </Link>
-      </p>
-    </main>
+    </AuthShell>
   )
 }

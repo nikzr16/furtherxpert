@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import AuthShell from '../components/AuthShell'
+import { Alert, Spinner } from '../components/ui'
 
 export default function Login() {
   const { login } = useAuth()
@@ -33,23 +35,26 @@ export default function Login() {
   }
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h2 className="text-xl font-semibold">Log in</h2>
+    <AuthShell
+      title="Welcome back"
+      subtitle="Log in to see your charts and matching programs."
+      footer={
+        <>
+          No account yet?{' '}
+          <Link to="/register" className="link">
+            Create one
+          </Link>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {justRegistered && <Alert tone="success">Account created. Log in to continue.</Alert>}
+        {error && <Alert tone="error">{error}</Alert>}
+      </div>
 
-      {justRegistered && (
-        <p className="mt-3 rounded border border-green-300 bg-green-50 p-2 text-sm text-green-800">
-          Account created. Log in to continue.
-        </p>
-      )}
-      {error && (
-        <p className="mt-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      )}
-
-      <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate>
+      <form className={`space-y-5 ${justRegistered || error ? 'mt-5' : ''}`} onSubmit={handleSubmit} noValidate>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium">
+          <label htmlFor="email" className="label">
             Email
           </label>
           <input
@@ -57,13 +62,14 @@ export default function Login() {
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded border border-gray-300 p-2 focus:outline focus:outline-2 focus:outline-blue-600"
+            placeholder="you@example.com"
+            className="input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium">
+          <label htmlFor="password" className="label">
             Password
           </label>
           <input
@@ -71,26 +77,16 @@ export default function Login() {
             type="password"
             required
             autoComplete="current-password"
-            className="mt-1 w-full rounded border border-gray-300 p-2 focus:outline focus:outline-2 focus:outline-blue-600"
+            className="input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800 disabled:opacity-50"
-        >
+        <button type="submit" disabled={submitting} className="btn btn-primary w-full py-3">
+          {submitting && <Spinner className="size-4" />}
           {submitting ? 'Logging in…' : 'Log in'}
         </button>
       </form>
-
-      <p className="mt-4 text-sm text-gray-600">
-        No account yet?{' '}
-        <Link to="/register" className="underline hover:no-underline">
-          Register
-        </Link>
-      </p>
-    </main>
+    </AuthShell>
   )
 }

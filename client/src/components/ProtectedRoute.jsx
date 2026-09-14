@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { PageLoader } from './ui'
 
 // Wraps a page that needs a login. Waits for the silent-refresh attempt on
 // app load to finish before deciding, so a logged-in student isn't bounced
@@ -9,11 +10,7 @@ export default function ProtectedRoute({ children }) {
   const location = useLocation()
 
   if (initializing) {
-    return (
-      <p className="mx-auto max-w-xl p-6 text-gray-500" role="status">
-        Loading…
-      </p>
-    )
+    return <PageLoader />
   }
 
   if (!isAuthenticated) {

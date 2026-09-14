@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getMyAnalysisSummary } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { Icon } from './ui'
 
 // The AI summary (Phase 7, PRD T7): fetched with its own independent
 // `GET /me/analysis/summary` call, separate from `GET /me/analysis`'s
@@ -31,23 +32,44 @@ export default function AISummaryCard() {
     }
   }, [authedFetch])
 
+  const isOk = !loading && !failed && result?.status === 'ok'
+  const notEnoughData = !loading && !failed && result?.status === 'not_enough_data'
+  const unavailable = !loading && (failed || result?.status === 'unavailable')
+
   return (
-    <section className="mt-4 rounded border border-gray-200 p-4" aria-label="AI summary">
-      <h3 className="text-lg font-semibold">Your summary</h3>
+    <section
+      className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-linear-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-sm sm:p-6"
+      aria-label="AI summary"
+    >
+      <div
+        className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-violet-200/40 blur-3xl"
+        aria-hidden="true"
+      />
+      <div className="relative flex items-center gap-3">
+        <span className="grid size-9 place-items-center rounded-xl bg-linear-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-600/30">
+          <Icon name="sparkles" className="size-5" />
+        </span>
+        <div>
+          <h2 className="font-semibold text-slate-900">Your summary</h2>
+          <p className="text-xs text-slate-500">Written by AI from your charts</p>
+        </div>
+      </div>
 
-      {loading && <p className="mt-2 text-gray-500">Loading your summary…</p>}
+      <div className="relative mt-4">
+        {loading && (
+          <div className="space-y-2.5" role="status" aria-label="Loading your summary">
+            <div className="h-3 w-full animate-pulse rounded-full bg-indigo-100" />
+            <div className="h-3 w-11/12 animate-pulse rounded-full bg-indigo-100" />
+            <div className="h-3 w-3/4 animate-pulse rounded-full bg-indigo-100" />
+          </div>
+        )}
 
-      {!loading && failed && <p className="mt-2 text-gray-500">Summary unavailable right now.</p>}
+        {isOk && <p className="leading-relaxed text-slate-700">{result.summary}</p>}
 
-      {!loading && !failed && result?.status === 'ok' && <p className="mt-2">{result.summary}</p>}
+        {notEnoughData && <p className="text-slate-600">{result.message}</p>}
 
-      {!loading && !failed && result?.status === 'not_enough_data' && (
-        <p className="mt-2 text-gray-500">{result.message}</p>
-      )}
-
-      {!loading && !failed && result?.status === 'unavailable' && (
-        <p className="mt-2 text-gray-500">Summary unavailable right now.</p>
-      )}
+        {unavailable && <p className="text-slate-500">Summary unavailable right now.</p>}
+      </div>
     </section>
   )
 }
