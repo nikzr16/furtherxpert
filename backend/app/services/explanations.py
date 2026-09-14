@@ -42,9 +42,9 @@ FIELD_WORDS: dict[str, str] = {
 GENERAL_TITLE = "General UPU rules (syarat am)"
 PROGRAM_TITLE = "This diploma's rules (syarat khas)"
 NO_PROGRAM_RULES = "No extra subject rules beyond the general ones."
-BUMIPUTERA_LINE = "Only open to Bumiputera students — you qualify."
+BUMIPUTERA_LINE = "Only open to Bumiputera students, and you qualify."
 ANY_LEAD = "You meet one of the allowed options:"
-NOTHING_NEEDED = "Nothing else needed — no interview or test."
+NOTHING_NEEDED = "Nothing else needed. No interview or test."
 INTERVIEW_REASON = "Requires interview/test"
 INTERVIEW_LINE = "You'll need to pass an interview or test."
 UNVERIFIABLE_PREFIX = "Cannot verify automatically: "
@@ -108,17 +108,17 @@ def _leaf_line(node: dict, codes: list[str], grades: dict[str, str], names: dict
 
     if "subject" in node or ("one_of" in node and len(node["one_of"]) == 1):
         code = codes[0]
-        return f"{name(code)} — needs {minimum}, you have {grades[code]}"
+        return f"{name(code)}: needs {minimum}, you have {grades[code]}"
     if "one_of" in node:
         options = node["one_of"]
         count = node.get("count", 1)
         if len(options) <= MAX_LISTED_OPTIONS:
             listed = " / ".join(name(code) for code in options)
-            return f"At least {minimum} in {count} of {listed} — {chosen}"
-        return f"At least {minimum} in {count} of {len(options)} listed subjects — {chosen}"
+            return f"At least {minimum} in {count} of {listed}: {chosen}"
+        return f"At least {minimum} in {count} of {len(options)} listed subjects: {chosen}"
     count = node["uncounted"]
     noun = "subject" if count == 1 else "subjects"
-    return f"{count} more {noun} at {minimum} or better — {chosen}"
+    return f"{count} more {noun} at {minimum} or better: {chosen}"
 
 
 def _rule_sections(
@@ -178,12 +178,20 @@ def explain_program(
       how many Eligible + Conditional diplomas the area has.
     """
     noun = "diploma" if total == 1 else "diplomas"
+    rules = _rule_sections(matching, grades, subject_names, bumiputera_only)
     return {
-        "match": _match_lines(program, area, excel, love),
-        "rules": _rule_sections(matching, grades, subject_names, bumiputera_only),
-        "still_needed": _still_needed(program["verdict"], program["reasons"]),
-        "position": (
+        "match": [_no_dashes(line) for line in _match_lines(program, area, excel, love)],
+        "rules": [{"title": s["title"], "lines": [_no_dashes(line) for line in s["lines"]]} for s in rules],
+        "still_needed": [_no_dashes(line) for line in _still_needed(program["verdict"], program["reasons"])],
+        "position": _no_dashes(
             f"{position} of {total} {noun} you can apply for in {area}. "
             "Eligible ones are shown first, then A to Z. See all of them on Explore."
         ),
     }
+
+
+def _no_dashes(text: str) -> str:
+    """The product owner asked for no long dashes in explanations
+    (2026-09-14). Our own wording has none; this also cleans text that comes
+    from data, such as program names or unverifiable rule notes."""
+    return text.replace(" — ", ", ").replace("—", "-").replace(" – ", ", ").replace("–", "-")

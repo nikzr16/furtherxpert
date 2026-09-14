@@ -22,6 +22,8 @@ placeholder API key, a timeout, or any OpenAI API error is raised as
 `summary: null` response; that's not this module's job.
 """
 
+import re
+
 from openai import OpenAI
 
 from app.core.config import settings
@@ -53,7 +55,8 @@ _SYSTEM_PROMPT = (
     "scores (0-100%, from a self-report interest test). You are not given "
     "the student's name, grades, race, citizenship, or any program or "
     "eligibility data, and you must never invent or assume any of that. "
-    "Write at most 120 words. Be encouraging but honest -- never exaggerate "
+    "Write at most 120 words. Don't use long dashes; use commas or full "
+    "stops instead. Be encouraging but honest. Never exaggerate "
     "or invent an achievement. Never name a specific university, diploma "
     "program, or course, and never say or imply the student is 'eligible' "
     "or 'qualified' for anything -- you have no eligibility data at all. "
@@ -153,4 +156,11 @@ def generate_summary(area_scores: list[dict], group_scores: list[dict]) -> str:
     text = response.choices[0].message.content if response.choices else None
     if not text or not text.strip():
         raise AISummaryError("OpenAI returned an empty reply")
-    return _enforce_word_limit(text.strip())
+    return _enforce_word_limit(_remove_long_dashes(text.strip()))
+
+
+def _remove_long_dashes(text: str) -> str:
+    """The product owner asked for no long dashes (— or –) in the summary
+    (2026-09-14, decision 0023). The prompt asks the model too, but a prompt
+    is only a request, so this is the real guarantee."""
+    return re.sub(r"\s*[—–]\s*", ", ", text)

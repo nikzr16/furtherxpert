@@ -193,6 +193,17 @@ def test_overlong_reply_is_truncated_to_120_words(client, make_register_payload,
     assert len(body["summary"].split()) <= 120
 
 
+def test_long_dashes_are_removed_from_the_summary(client, make_register_payload, fake_openai):
+    """Decision 0023: no long dashes, enforced in code, not just the prompt."""
+    _, token, _ = _register_and_login(client, make_register_payload)
+    _complete_data(client, token)
+    fake_openai.configure(text="You're strong in Sciences — keep going. Tech – and design – suit you.")
+
+    body = client.get("/me/analysis/summary", headers=_auth(token)).json()
+    assert body["status"] == "ok"
+    assert body["summary"] == "You're strong in Sciences, keep going. Tech, and design, suit you."
+
+
 # --- AI failure never breaks /me/analysis, and /me/analysis/summary is friendly ---
 
 

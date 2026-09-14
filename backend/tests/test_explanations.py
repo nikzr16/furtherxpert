@@ -63,15 +63,15 @@ def test_excel_only_finance_diploma_with_no_extra_rules():
         {
             "title": "General UPU rules (syarat am)",
             "lines": [
-                "Bahasa Melayu — needs C, you have A",
-                "Sejarah — needs E, you have B",
+                "Bahasa Melayu: needs C, you have A",
+                "Sejarah: needs E, you have B",
                 # Left after BM and SJ: MT A, EK A-, GG C -> MT, EK.
-                "2 more subjects at C or better — Matematik (A), Ekonomi (A-)",
+                "2 more subjects at C or better: Matematik (A), Ekonomi (A-)",
             ],
         },
         {"title": "This diploma's rules (syarat khas)", "lines": ["No extra subject rules beyond the general ones."]},
     ]
-    assert why["still_needed"] == ["Nothing else needed — no interview or test."]
+    assert why["still_needed"] == ["Nothing else needed. No interview or test."]
     assert why["position"] == (
         "1 of 9 diplomas you can apply for in Business & Management. "
         "Eligible ones are shown first, then A to Z. See all of them on Explore."
@@ -160,20 +160,20 @@ def test_one_option_rule_reads_like_a_subject_rule_and_lists_short_options():
         {
             "title": "General UPU rules (syarat am)",
             "lines": [
-                "Bahasa Melayu — needs C, you have A",
-                "Sejarah — needs E, you have C",
-                "2 more subjects at C or better — Fizik (B), Geografi (B)",
+                "Bahasa Melayu: needs C, you have A",
+                "Sejarah: needs E, you have C",
+                "2 more subjects at C or better: Fizik (B), Geografi (B)",
             ],
         },
         {
             "title": "This diploma's rules (syarat khas)",
             "lines": [
-                "Bahasa Inggeris — needs C, you have B",
-                "At least C in 1 of Fizik / Kimia / Biologi — Kimia (A)",
+                "Bahasa Inggeris: needs C, you have B",
+                "At least C in 1 of Fizik / Kimia / Biologi: Kimia (A)",
                 "You meet one of the allowed options:",
-                "Ekonomi — needs E, you have D",
-                "Matematik — needs C, you have B",
-                "Only open to Bumiputera students — you qualify.",
+                "Ekonomi: needs E, you have D",
+                "Matematik: needs C, you have B",
+                "Only open to Bumiputera students, and you qualify.",
             ],
         },
     ]
@@ -188,7 +188,23 @@ def test_long_option_lists_are_summarised_as_a_count():
         area="Science & Technology",
         excel={"rank": 1, "score": 90.0, "groups": [("Sciences", 90.0)]},
     )
-    assert why["rules"][1]["lines"] == ["At least C in 1 of 7 listed subjects — Fizik (A+)"]
+    assert why["rules"][1]["lines"] == ["At least C in 1 of 7 listed subjects: Fizik (A+)"]
+
+
+def test_long_dashes_from_data_are_removed():
+    program = _program(
+        "0211",
+        "Seni Halus — Lukisan",
+        verdict="Conditional",
+        reasons=["Cannot verify automatically: Tidak rabun warna — sila semak."],
+    )
+    why = _explain(program, {"all": []}, {"BM": "C", "SJ": "D", "BI": "C", "EK": "C"}, area="Arts & Design",
+                   love={"rank": 1, "score": 20.0, "picks": 3, "offered": 15}, total=1)
+    assert why["match"][0] == (
+        "This is an arts and design diploma: its field of study, Seni Halus, Lukisan (code 0211), is part of Arts & Design."
+    )
+    assert why["still_needed"] == ["Check this yourself, as we can't confirm it from grades: Tidak rabun warna, sila semak."]
+    assert "—" not in str(why) and "–" not in str(why)
 
 
 def test_conditional_diploma_says_what_is_still_needed():

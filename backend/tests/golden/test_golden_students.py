@@ -280,24 +280,24 @@ def test_why_amir_ue4481001_lists_every_rule_with_the_grade_that_meets_it(client
         {
             "title": "General UPU rules (syarat am)",
             "lines": [
-                "Bahasa Melayu — needs C, you have A+",
-                "Sejarah — needs E, you have A",
-                "2 more subjects at C or better — Matematik Tambahan (A+), Sains Komputer (A+)",
+                "Bahasa Melayu: needs C, you have A+",
+                "Sejarah: needs E, you have A",
+                "2 more subjects at C or better: Matematik Tambahan (A+), Sains Komputer (A+)",
             ],
         },
         {
             "title": "This diploma's rules (syarat khas)",
             "lines": [
-                "Bahasa Inggeris — needs C, you have A",
-                "Matematik — needs C, you have A+",
-                "At least C in 1 of 15 listed subjects — Fizik (A+)",
-                "2 more subjects at C or better — Biologi (A), Kimia (A)",
-                "Only open to Bumiputera students — you qualify.",
+                "Bahasa Inggeris: needs C, you have A",
+                "Matematik: needs C, you have A+",
+                "At least C in 1 of 15 listed subjects: Fizik (A+)",
+                "2 more subjects at C or better: Biologi (A), Kimia (A)",
+                "Only open to Bumiputera students, and you qualify.",
             ],
         },
     ]
     assert why["match"][0] == "This is a computing diploma: its field of study, Sains Komputer (code 0613), is part of Science & Technology."
-    assert why["still_needed"] == ["Nothing else needed — no interview or test."]
+    assert why["still_needed"] == ["Nothing else needed. No interview or test."]
 
 
 def test_why_rahman_ue4213001_is_conditional_with_no_extra_rules(client):
@@ -317,9 +317,9 @@ def test_why_rahman_ue4213001_is_conditional_with_no_extra_rules(client):
         {
             "title": "General UPU rules (syarat am)",
             "lines": [
-                "Bahasa Melayu — needs C, you have C",
-                "Sejarah — needs E, you have D",
-                "2 more subjects at C or better — Bahasa Inggeris (C), Ekonomi (C)",
+                "Bahasa Melayu: needs C, you have C",
+                "Sejarah: needs E, you have D",
+                "2 more subjects at C or better: Bahasa Inggeris (C), Ekonomi (C)",
             ],
         },
         {"title": "This diploma's rules (syarat khas)", "lines": ["No extra subject rules beyond the general ones."]},
@@ -348,7 +348,7 @@ def test_why_is_on_every_best_fit_diploma_and_matches_amirs_scores(client, make_
             total = int(why["position"].split(" of ")[1].split(" ")[0])
             assert total >= len(area["programs"])
             if program["verdict"] == "Eligible":
-                assert why["still_needed"] == ["Nothing else needed — no interview or test."]
+                assert why["still_needed"] == ["Nothing else needed. No interview or test."]
     for program in science_tech["programs"]:
         assert program["why"]["match"][1:] == AMIR_SCIENCE_TECH_AREA_LINES
 
@@ -358,6 +358,7 @@ def test_why_never_shows_race_or_interest_test_wording(client, make_register_pay
     whys = json.dumps([p["why"] for area in body["best_fit"] for p in area["programs"]], ensure_ascii=False)
     assert whys != "[]"
     assert "Cina" not in whys
+    assert "—" not in whys and "–" not in whys
     # No interest test question, and no answer long enough to be recognisable
     # (very short answers like "Law" could match an area name by chance).
     bank = json.loads((GOLDEN_DIR.parents[1] / "data" / "interest_test.json").read_text(encoding="utf-8"))

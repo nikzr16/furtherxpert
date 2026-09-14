@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getMyInterestTest, putMyInterestAnswers, rotateMyInterestTest } from '../api'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getMyInterestAnswers, getMyInterestTest, putMyInterestAnswers, rotateMyInterestTest } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Alert, Icon, PageError, PageHeader, PageLoader, Spinner } from '../components/ui'
 
+// How long the "Submitted" dialog stays before going to My Results.
+const REDIRECT_DELAY_MS = 2500
+
 export default function InterestTest() {
   const { authedFetch } = useAuth()
+  const navigate = useNavigate()
   const [questions, setQuestions] = useState([])
   const [answers, setAnswers] = useState({}) // question_id -> option_id
   const [hasFinishedSet, setHasFinishedSet] = useState(false)
@@ -15,6 +19,9 @@ export default function InterestTest() {
   const [saveError, setSaveError] = useState(null)
   const [confirmingRotate, setConfirmingRotate] = useState(false)
   const [rotating, setRotating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const goNowRef = useRef(null)
 
   // One call loads the student's own set with its saved answers, so the
   // questions and answers always belong to the same set.
@@ -42,8 +49,17 @@ export default function InterestTest() {
     }
   }, [authedFetch])
 
+  // After submitting: focus the dialog's button, then go to My Results after a moment.
+  useEffect(() => {
+    if (!submitted) return undefined
+    goNowRef.current?.focus()
+    const timer = setTimeout(() => navigate('/my-results'), REDIRECT_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [submitted, navigate])
+
   const answeredCount = Object.keys(answers).length
   const complete = questions.length > 0 && answeredCount >= questions.length
+  const remaining = Math.max(questions.length - answeredCount, 0)
   const percent = questions.length > 0 ? Math.round((Math.min(answeredCount, questions.length) / questions.length) * 100) : 0
 
   async function choose(questionId, optionId) {
@@ -85,6 +101,22 @@ export default function InterestTest() {
     else setConfirmingRotate(true)
   }
 
+  // Answers already save one by one, so Submit only double-checks with the
+  // server that all of them landed before confirming.
+  async function submit() {
+    setSaveError(null)
+    setSubmitting(true)
+    try {
+      const progress = await getMyInterestAnswers(authedFetch)
+      if (progress.complete) setSubmitted(true)
+      else setSaveError("Some answers haven't saved yet. Please check every question and try again.")
+    } catch (error) {
+      setSaveError(error.message || 'Could not submit. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) return <PageLoader label="Loading the interest test…" />
   if (loadError) return <PageError message={loadError} />
 
@@ -93,7 +125,7 @@ export default function InterestTest() {
       <PageHeader
         eyebrow="Step 2 of 2"
         title="Interest test"
-        description={`Pick whichever option feels closest. Answer all ${questions.length} to see your interest chart. Each answer saves right away, so you can close this and pick up right where you left off.`}
+        description={`Pick whichever option feels closest, then press Submit at the bottom once all ${questions.length} are answered. Each answer saves right away, so you can close this and pick up right where you left off.`}
       />
 
       {/* Progress sits just under the sticky site header. */}
@@ -111,7 +143,7 @@ export default function InterestTest() {
           <button
             type="button"
             onClick={requestRotate}
-            disabled={rotating || confirmingRotate}
+            disabled={rotating || confirmingRotate || submitted}
             className="btn btn-secondary btn-sm shrink-0"
           >
             {rotating && !confirmingRotate && <Spinner className="size-4" />}
@@ -156,34 +188,14 @@ export default function InterestTest() {
       </div>
 
       <div className="container-page max-w-3xl py-8 lg:py-10">
-        <div className="space-y-3">
-          {saveError && <Alert tone="error">{saveError}</Alert>}
-          {hasFinishedSet && answeredCount === 0 && (
-            <Alert tone="info">
-              Here's a fresh set of {questions.length} questions. Your last results stay on My Results until you
-              finish this set.
-            </Alert>
-          )}
-          {complete && (
-            <div className="card flex flex-col gap-4 border-emerald-200 bg-emerald-50/60 p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
-                  <Icon name="check" className="size-5" strokeWidth={2.5} />
-                </span>
-                <div>
-                  <p className="font-semibold text-emerald-900">You've answered every question</p>
-                  <p className="text-sm text-emerald-800">Your interest chart is ready.</p>
-                </div>
-              </div>
-              <Link to="/my-results" className="btn btn-primary">
-                View your results
-                <Icon name="arrowRight" className="size-4" />
-              </Link>
-            </div>
-          )}
-        </div>
+        {hasFinishedSet && answeredCount === 0 && (
+          <Alert tone="info" className="mb-6">
+            Here's a fresh set of {questions.length} questions. Your last results stay on My Results until you
+            finish this set.
+          </Alert>
+        )}
 
-        <ol className={`space-y-4 ${saveError || complete || (hasFinishedSet && answeredCount === 0) ? 'mt-6' : ''}`}>
+        <ol className="space-y-4">
           {questions.map((question, index) => {
             const isSaving = savingQuestionId === question.id
             const isAnswered = answers[question.id] != null
@@ -213,7 +225,7 @@ export default function InterestTest() {
                           name={`question-${question.id}`}
                           checked={answers[question.id] === option.id}
                           onChange={() => choose(question.id, option.id)}
-                          disabled={isSaving || rotating}
+                          disabled={isSaving || rotating || submitted}
                         />
                         <span
                           className="grid size-5 shrink-0 place-items-center rounded-full border-2 border-slate-300 transition group-has-checked:border-indigo-600 group-has-checked:bg-indigo-600"
@@ -239,7 +251,52 @@ export default function InterestTest() {
             )
           })}
         </ol>
+
+        <div className="mt-8 space-y-3">
+          {saveError && <Alert tone="error">{saveError}</Alert>}
+          <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <p className="text-sm text-slate-600">
+              {complete
+                ? "You've answered every question. Press Submit when you're ready."
+                : `Answer all ${questions.length} questions to submit. ${remaining} ${remaining === 1 ? 'question' : 'questions'} left.`}
+            </p>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!complete || submitting || savingQuestionId !== null || rotating || submitted}
+              className="btn btn-primary btn-lg shrink-0"
+            >
+              {submitting && <Spinner className="size-4" />}
+              Submit
+            </button>
+          </div>
+        </div>
       </div>
+
+      {submitted && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 px-4 backdrop-blur-sm">
+          <div
+            className="card w-full max-w-sm p-6 text-center shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="submitted-title"
+            aria-describedby="submitted-description"
+          >
+            <span className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500 text-white">
+              <Icon name="check" className="size-6" strokeWidth={2.5} />
+            </span>
+            <h2 id="submitted-title" className="mt-4 text-lg font-semibold text-slate-900">
+              Submitted
+            </h2>
+            <p id="submitted-description" className="mt-1 text-sm text-slate-600">
+              Your answers are saved. Taking you to your results…
+            </p>
+            <button ref={goNowRef} type="button" onClick={() => navigate('/my-results')} className="btn btn-primary mt-5 w-full">
+              Go now
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
