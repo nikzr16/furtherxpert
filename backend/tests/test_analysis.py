@@ -35,17 +35,20 @@ def _put_results(client, token, items):
     return resp.json()
 
 
-def _first_two_questions(client) -> list[dict]:
-    questions = client.get("/interest-test").json()
-    return questions[:2]
+def _set_questions(client, token) -> list[dict]:
+    return client.get("/me/interest-test", headers=_auth(token)).json()["questions"]
+
+
+def _first_two_questions(client, token) -> list[dict]:
+    return _set_questions(client, token)[:2]
 
 
 def _answer_all_questions_one_tagged(client, token, tagged_option_id: int, tagged_question_id: int) -> None:
-    """Complete all 20 questions: `tagged_question_id` gets
+    """Complete all 40 questions in the set: `tagged_question_id` gets
     `tagged_option_id` (an area-tagged option), every other question gets
     its own "None of the above" option -- so exactly one area has any picks
     at all, and the interest test is complete (PRD T1, decision 0008)."""
-    questions = client.get("/interest-test").json()
+    questions = _set_questions(client, token)
     payload = []
     for q in questions:
         if q["id"] == tagged_question_id:
@@ -156,11 +159,11 @@ def test_cache_invalidation_on_results_change(client, make_register_payload):
 
 def test_cache_invalidation_on_answers_change(client, make_register_payload, db_session):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1, _q2 = _first_two_questions(client)
+    q1, _q2 = _first_two_questions(client, token)
     tagged_option = _non_none_option(q1)
     area_name = _area_name_for_option(db_session, tagged_option["id"])
 
-    # Complete all 20 questions (decision 0008: interest scores are only
+    # Complete all 40 questions (decision 0008: interest scores are only
     # ever computed once the test is complete) with only q1 tagged to a
     # real area.
     _answer_all_questions_one_tagged(client, token, tagged_option["id"], q1["id"])
@@ -175,7 +178,7 @@ def test_cache_invalidation_on_answers_change(client, make_register_payload, db_
     assert again["computed_at"] == first["computed_at"]
 
     # Retake: switch q1's answer to "None of the above" (the test is still
-    # complete -- all 20 questions are still answered) -- the tagged area's
+    # complete -- all 40 questions are still answered) -- the tagged area's
     # pick count (and therefore score) must drop, and the cache must have
     # been invalidated so this is visible immediately.
     none_option = _none_option(q1)
@@ -194,17 +197,60 @@ def test_cache_invalidation_on_answers_change(client, make_register_payload, db_
     assert second["computed_at"] != first["computed_at"]
 
 
+# --- Scores use the student's own set, not the whole bank (rotation PRD T1) ---
+
+
+def test_interest_scores_divide_by_the_sets_own_counts_not_the_whole_bank(
+    client, make_register_payload, db_session
+):
+    """A fixed set of bank questions 1-40 offers Science & Technology in 18
+    questions and Healthcare & Social Services in 17 (hand-counted from
+    `backend/data/interest_test.json`). One pick each gives 1/18*100 = 5.6
+    and 1/17*100 = 5.9. Dividing by the whole bank (134 each) would give 0.7."""
+    import uuid
+
+    from app.models.interest_test import InterestQuestion, InterestTestSet, InterestTestSetQuestion
+
+    _, token, user_id = _register_and_login(client, make_register_payload)
+    ids_by_n = dict(
+        db_session.execute(select(InterestQuestion.n, InterestQuestion.id).where(InterestQuestion.n <= 40)).all()
+    )
+    test_set = InterestTestSet(user_id=uuid.UUID(user_id))
+    db_session.add(test_set)
+    db_session.flush()
+    for n in range(1, 41):
+        db_session.add(InterestTestSetQuestion(set_id=test_set.id, position=n, question_id=ids_by_n[n]))
+    db_session.flush()
+
+    # Question 1 offers "Build a robot or simple app" (Science & Technology);
+    # question 3 offers "How the body fights disease" (Healthcare & Social Services).
+    picks = {1: "Build a robot or simple app", 3: "How the body fights disease"}
+    payload = []
+    for q in _set_questions(client, token):
+        n = next(n for n, qid in ids_by_n.items() if qid == q["id"])
+        wanted = picks.get(n, "None of the above")
+        payload.append({"question_id": q["id"], "option_id": next(o["id"] for o in q["options"] if o["text"] == wanted)})
+    assert client.put("/me/interest-answers", json=payload, headers=_auth(token)).status_code == 200
+
+    body = client.get("/me/analysis", headers=_auth(token)).json()
+    scores = {a["area"]: a["score"] for a in body["interest_areas"]}
+    assert scores["Science & Technology"] == 5.6
+    assert scores["Healthcare & Social Services"] == 5.9
+    picked_areas = {"Science & Technology", "Healthcare & Social Services"}
+    assert all(score == 0.0 for area, score in scores.items() if area not in picked_areas)
+
+
 # --- Likely to love excludes 0-score areas (decision 0007) --------------------
 
 
 def test_love_list_holds_one_item_when_only_one_area_has_a_nonzero_score(client, make_register_payload, db_session):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1, _q2 = _first_two_questions(client)
+    q1, _q2 = _first_two_questions(client, token)
     tagged_option = _non_none_option(q1)
     area_name = _area_name_for_option(db_session, tagged_option["id"])
 
     # Interest scores are only computed once the test is complete (decision
-    # 0008); complete all 20 with only q1 tagged to a real area.
+    # 0008); complete all 40 with only q1 tagged to a real area.
     _answer_all_questions_one_tagged(client, token, tagged_option["id"], q1["id"])
 
     body = client.get("/me/analysis", headers=_auth(token)).json()
@@ -221,18 +267,18 @@ def test_love_list_holds_one_item_when_only_one_area_has_a_nonzero_score(client,
 def test_love_list_and_interest_areas_stay_empty_until_the_interest_test_is_complete(
     client, make_register_payload, db_session
 ):
-    """A part-finished interest test (decision 0008): fewer than 20
+    """A part-finished interest test (decision 0008): fewer than 40
     questions answered means `interest_areas` stays forced to 0, and
     `likely_to_love` stays empty, even though the picks so far would
     otherwise score a real area. Finishing the remaining questions flips
     `interest_test_complete` and the scores appear."""
     _, token, _ = _register_and_login(client, make_register_payload)
-    questions = client.get("/interest-test").json()
+    questions = _set_questions(client, token)
     q1 = questions[0]
     tagged_option = _non_none_option(q1)
     area_name = _area_name_for_option(db_session, tagged_option["id"])
 
-    # Answer only 5 of 20 -- a real, tagged pick among them.
+    # Answer only 5 of 40 -- a real, tagged pick among them.
     partial_payload = [{"question_id": q1["id"], "option_id": tagged_option["id"]}]
     for q in questions[1:5]:
         none_option = _none_option(q)
@@ -245,7 +291,7 @@ def test_love_list_and_interest_areas_stay_empty_until_the_interest_test_is_comp
     assert all(entry["score"] == 0.0 for entry in body["interest_areas"])
     assert body["likely_to_love"] == []
 
-    # Finish the remaining 15 questions, all "None of the above".
+    # Finish the remaining 35 questions, all "None of the above".
     remaining_payload = [
         {"question_id": q["id"], "option_id": _none_option(q)["id"]} for q in questions[5:]
     ]

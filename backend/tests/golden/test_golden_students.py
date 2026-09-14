@@ -19,11 +19,16 @@ relying on Best Fit's top-3-by-name truncation to surface them.
 """
 
 import json
+import uuid
 from pathlib import Path
 
+from sqlalchemy import select
+
+from app.models.interest_test import InterestQuestion, InterestTestSet, InterestTestSetQuestion
 from app.services.analysis import BUMIPUTERA_RACES
 from app.services.eligibility import evaluate_eligibility
 
+FIXED_SET_SIZE = 40
 GOLDEN_DIR = Path(__file__).parent
 STUDENTS = json.loads((GOLDEN_DIR / "students.json").read_text(encoding="utf-8"))["students"]
 STUDENTS_BY_NAME = {s["name"]: s for s in STUDENTS}
@@ -43,15 +48,34 @@ def _register_and_login(client, make_register_payload, student: dict):
     assert register_response.status_code == 201, register_response.text
     login_response = client.post("/auth/login", json={"email": payload["email"], "password": payload["password"]})
     assert login_response.status_code == 200, login_response.text
-    return login_response.json()["access_token"]
+    return login_response.json()["access_token"], uuid.UUID(register_response.json()["id"])
 
 
-def _resolve_interest_picks(client, picks: list[dict]) -> list[dict]:
+def _give_fixed_set(db_session, user_id: uuid.UUID) -> None:
+    """Phase 9 (rotation plan Step 9.2 task 8): give the student a fixed set --
+    bank questions 1-40, in order -- instead of a random draw, so the expected
+    numbers never depend on randomness. In that set, Healthcare & Social
+    Services and Media & Communications are offered by 17 questions each, and
+    every other area by 18."""
+    question_ids = dict(
+        db_session.execute(
+            select(InterestQuestion.n, InterestQuestion.id).where(InterestQuestion.n.between(1, FIXED_SET_SIZE))
+        ).all()
+    )
+    test_set = InterestTestSet(user_id=user_id)
+    db_session.add(test_set)
+    db_session.flush()
+    for n in range(1, FIXED_SET_SIZE + 1):
+        db_session.add(InterestTestSetQuestion(set_id=test_set.id, position=n, question_id=question_ids[n]))
+    db_session.flush()
+
+
+def _resolve_interest_picks(client, token: str, picks: list[dict]) -> list[dict]:
     """Turn `[{"question_text": ..., "option_text": ...}, ...]` into
     `[{"question_id": ..., "option_id": ...}, ...]` by matching the exact
-    `text` fields returned by the real, seeded `GET /interest-test`.
+    `text` fields of the student's current set from `GET /me/interest-test`.
     """
-    questions = client.get("/interest-test").json()
+    questions = client.get("/me/interest-test", headers=_auth(token)).json()["questions"]
     by_text = {q["text"]: q for q in questions}
     resolved = []
     for pick in picks:
@@ -61,17 +85,18 @@ def _resolve_interest_picks(client, picks: list[dict]) -> list[dict]:
     return resolved
 
 
-def _run_student(client, make_register_payload, student: dict) -> dict:
+def _run_student(client, make_register_payload, db_session, student: dict) -> dict:
     """Register, PUT results, optionally PUT interest answers, and return
     the `GET /me/analysis` body for one golden student.
     """
-    token = _register_and_login(client, make_register_payload, student)
+    token, user_id = _register_and_login(client, make_register_payload, student)
 
     put_results_resp = client.put("/me/results", json=student["results"], headers=_auth(token))
     assert put_results_resp.status_code == 200, put_results_resp.text
 
     if student["call_interest_answers"]:
-        resolved = _resolve_interest_picks(client, student["interest_picks"])
+        _give_fixed_set(db_session, user_id)
+        resolved = _resolve_interest_picks(client, token, student["interest_picks"])
         put_answers_resp = client.put("/me/interest-answers", json=resolved, headers=_auth(token))
         assert put_answers_resp.status_code == 200, put_answers_resp.text
 
@@ -123,11 +148,11 @@ def _load_expected(name: str) -> dict:
 # --- Amir: Melayu, citizen, spm_year 2025 (category A) ------------------------
 
 
-def test_amir(client, make_register_payload):
+def test_amir(client, make_register_payload, db_session):
     student = STUDENTS_BY_NAME["amir"]
     expected = _load_expected("amir")
 
-    body = _run_student(client, make_register_payload, student)
+    body = _run_student(client, make_register_payload, db_session, student)
     _assert_matches_expected(body, expected)
 
     best_fit_areas = {area["area"] for area in body["best_fit"]}
@@ -137,9 +162,9 @@ def test_amir(client, make_register_payload):
 # --- Mei Ling: identical results/answers to Amir, only race differs -----------
 
 
-def test_mei_ling_matches_amir_because_race_never_affects_scoring(client, make_register_payload):
-    amir_body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["amir"])
-    mei_ling_body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["mei_ling"])
+def test_mei_ling_matches_amir_because_race_never_affects_scoring(client, make_register_payload, db_session):
+    amir_body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["amir"])
+    mei_ling_body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["mei_ling"])
     expected = _load_expected("mei_ling")
 
     _assert_matches_expected(mei_ling_body, expected)
@@ -153,32 +178,32 @@ def test_mei_ling_matches_amir_because_race_never_affects_scoring(client, make_r
 # --- Priya: India, citizen, spm_year 2020 (category B) ------------------------
 
 
-def test_priya(client, make_register_payload):
-    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["priya"])
+def test_priya(client, make_register_payload, db_session):
+    body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["priya"])
     _assert_matches_expected(body, _load_expected("priya"))
 
 
 # --- Rahman: Anak Negeri Sabah, citizen, spm_year 2025 (category A), no interest test ---
 
 
-def test_rahman(client, make_register_payload):
-    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["rahman"])
+def test_rahman(client, make_register_payload, db_session):
+    body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["rahman"])
     _assert_matches_expected(body, _load_expected("rahman"))
 
 
 # --- Aisyah: Melayu, citizen, spm_year 2025 (category A), no science subjects ---
 
 
-def test_aisyah(client, make_register_payload):
-    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["aisyah"])
+def test_aisyah(client, make_register_payload, db_session):
+    body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["aisyah"])
     _assert_matches_expected(body, _load_expected("aisyah"))
 
 
 # --- Daniel: non-citizen, spm_year 2025 (category A), good grades -------------
 
 
-def test_daniel(client, make_register_payload):
-    body = _run_student(client, make_register_payload, STUDENTS_BY_NAME["daniel"])
+def test_daniel(client, make_register_payload, db_session):
+    body = _run_student(client, make_register_payload, db_session, STUDENTS_BY_NAME["daniel"])
     expected = _load_expected("daniel")
     _assert_matches_expected(body, expected)
 

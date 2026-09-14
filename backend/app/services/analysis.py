@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.importer.reference_data import match_interest_area
 from app.models.analysis import Analysis
 from app.models.interest_area import InterestArea
-from app.models.interest_test import InterestAnswer, InterestOption, InterestQuestion
+from app.models.interest_test import InterestAnswer, InterestOption, InterestTestSet, InterestTestSetQuestion
 from app.models.program import Program
 from app.models.requirement import GeneralRequirement, ProgramRequirement
 from app.models.spm_result import SPMResult
@@ -100,35 +100,40 @@ def get_analysis(db: DbSession, user: User) -> dict:
     area_subject_groups = {a.name: a.subject_groups for a in areas}
     area_name_by_id = {a.id: a.name for a in areas}
 
-    # --- f. Max picks per area: COUNT(DISTINCT question_id) per area_id -------------------
+    # --- f. The latest finished interest test set (rotation PRD T1). A part-finished set
+    # never feeds the chart (decision 0008), so without a finished set every interest
+    # score stays at 0.
+    finished_set_id = db.execute(
+        select(InterestTestSet.id)
+        .where(InterestTestSet.user_id == user.id, InterestTestSet.completed_at.isnot(None))
+        .order_by(InterestTestSet.id.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    interest_test_complete = finished_set_id is not None
+
     max_picks_by_area = {a.name: 0 for a in areas}
-    max_picks_rows = db.execute(
-        select(InterestOption.area_id, func.count(func.distinct(InterestOption.question_id)))
-        .where(InterestOption.area_id.isnot(None))
-        .group_by(InterestOption.area_id)
-    ).all()
-    for area_id, count in max_picks_rows:
-        if area_id in area_name_by_id:
-            max_picks_by_area[area_name_by_id[area_id]] = count
+    picks_by_area: dict[str, int] = {}
+    if interest_test_complete:
+        # --- f2. Max picks per area: how many questions IN THAT SET offer the area -----
+        max_picks_rows = db.execute(
+            select(InterestOption.area_id, func.count(func.distinct(InterestOption.question_id)))
+            .join(InterestTestSetQuestion, InterestTestSetQuestion.question_id == InterestOption.question_id)
+            .where(InterestTestSetQuestion.set_id == finished_set_id, InterestOption.area_id.isnot(None))
+            .group_by(InterestOption.area_id)
+        ).all()
+        for area_id, count in max_picks_rows:
+            if area_id in area_name_by_id:
+                max_picks_by_area[area_name_by_id[area_id]] = count
 
-    # --- g. Student's picks per area (skip "None of the above", area_id IS NULL) ----------
-    pick_rows = db.execute(
-        select(InterestOption.area_id, func.count())
-        .select_from(InterestAnswer)
-        .join(InterestOption, InterestAnswer.chosen_option_id == InterestOption.id)
-        .where(InterestAnswer.user_id == user.id, InterestOption.area_id.isnot(None))
-        .group_by(InterestOption.area_id)
-    ).all()
-    picks_by_area = {area_name_by_id[area_id]: count for area_id, count in pick_rows if area_id in area_name_by_id}
-
-    # --- g2. Interest-test completeness gate (decision 0008): interest scores are only
-    # computed once all 20 questions are answered -- a part-finished test must never
-    # leak a partial (and therefore misleading) score into the chart or Best Fit.
-    total_questions = db.execute(select(func.count()).select_from(InterestQuestion)).scalar_one()
-    answered_questions = db.execute(
-        select(func.count(func.distinct(InterestAnswer.question_id))).where(InterestAnswer.user_id == user.id)
-    ).scalar_one()
-    interest_test_complete = total_questions > 0 and answered_questions >= total_questions
+        # --- g. Student's picks per area in that set (skip "None of the above") --------
+        pick_rows = db.execute(
+            select(InterestOption.area_id, func.count())
+            .select_from(InterestAnswer)
+            .join(InterestOption, InterestAnswer.chosen_option_id == InterestOption.id)
+            .where(InterestAnswer.set_id == finished_set_id, InterestOption.area_id.isnot(None))
+            .group_by(InterestOption.area_id)
+        ).all()
+        picks_by_area = {area_name_by_id[area_id]: count for area_id, count in pick_rows if area_id in area_name_by_id}
 
     # --- h. General requirements (syarat am) for this session + category ------------------
     general = db.execute(
@@ -165,9 +170,9 @@ def get_analysis(db: DbSession, user: User) -> dict:
         love_scores = interest_area_scores(picks_by_area, max_picks_by_area)
         love_top3 = top_three(love_scores, tiebreak_scores=excel_scores_, exclude_zero=True)
     else:
-        # Completeness gate (decision 0008): until all 20 questions are
-        # answered, every interest score is forced to 0 -- a part-finished
-        # test's picks so far must never appear as a real score.
+        # Completeness gate (decision 0008): until a set is fully answered,
+        # every interest score is forced to 0 -- a part-finished test's
+        # picks so far must never appear as a real score.
         love_scores = {a.name: 0.0 for a in areas}
         love_top3 = []
     excel_top3 = top_three(excel_scores_, tiebreak_scores=love_scores)

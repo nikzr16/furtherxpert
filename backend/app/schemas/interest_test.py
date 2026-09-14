@@ -1,8 +1,8 @@
-"""Request/response shapes for `GET /interest-test` and
-`PUT /me/interest-answers` (PRD T1, T6).
+"""Request/response shapes for the interest test routes (PRD T1, T6;
+rotation PRD T2).
 
 `InterestOptionPublic` deliberately carries no `area_id` / area name: PRD T6
-says `GET /interest-test` must not leak which option maps to which area.
+says the question lists must not leak which option maps to which area.
 """
 
 from pydantic import BaseModel
@@ -34,12 +34,25 @@ class InterestAnswerOut(BaseModel):
 
 
 class InterestAnswersProgressOut(BaseModel):
-    """Response shape for `GET /me/interest-answers` (Phase 6 client pages):
-    the student's saved answers so far, plus whether all 20 questions have
-    been answered yet. `complete` drives the completeness gate on
-    `GET /me/analysis`'s interest chart/Best Fit (see
-    `app/services/analysis.py`) and lets the client resume a part-finished
-    test and show progress (e.g. "12 of 20")."""
+    """Response shape for `GET /me/interest-answers`: the saved answers for
+    the student's current set, plus whether every question in it is answered
+    (Phase 9: all 40)."""
 
     answers: list[InterestAnswerOut]
     complete: bool
+
+
+class InterestTestSetOut(BaseModel):
+    """Response shape for `GET /me/interest-test` and
+    `POST /me/interest-test/rotate` (rotation PRD T2): the student's current
+    set of questions in display order, with saved answers and progress.
+    `has_finished_set` is true when an earlier finished set still feeds
+    My Results."""
+
+    set_id: int
+    questions: list[InterestQuestionPublic]
+    answers: list[InterestAnswerOut]
+    answered: int
+    total: int
+    complete: bool
+    has_finished_set: bool

@@ -130,7 +130,7 @@ These 4 routes are **public** -- no login needed, because they're just lookup li
 
 ## Flow 3: Student input
 
-Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school leaving exam) results a student enters by hand, and their answers to the 20-question interest test. Both are personal data, so every route in this flow needs a login, and each route only ever touches the logged-in student's own rows -- the same rule as Flow 1's `/me` routes.
+Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school leaving exam) results a student enters by hand, and their answers to the 40-question interest test. Both are personal data, so every route in this flow needs a login, and each route only ever touches the logged-in student's own rows -- the same rule as Flow 1's `/me` routes.
 
 ### 1. Save SPM results
 
@@ -152,25 +152,32 @@ Student input is the SPM (**Sijil Pelajaran Malaysia**, Malaysia's high-school l
 
 ### 3. Take or retake the interest test
 
-**Input:** `GET /interest-test` (no login needed -- it's a fixed question list, not personal data, same as Flow 2's lookup routes). Returns all 20 questions, each with its options' text and id only -- **never** which interest area an option counts toward. That's on purpose: knowing the mapping would let a student game their own score.
+**Input:** `GET /me/interest-test` (Phase 9, rotation PRD T2). Returns the student's own current **set**: 40 questions from the 300-question bank, in display order. Each question has its options' text and id only -- **never** which interest area an option counts toward. That's on purpose: knowing the mapping would let a student game their own score. The response also carries the saved answers, `answered`, `total`, `complete`, and `has_finished_set` (true when an earlier finished set still feeds My Results).
+**Actions:**
+1. Lock the student's row, so two tabs opening at once can't create two sets.
+2. **No set yet, or the latest set is finished:** draw a new set (`services/question_sets.py`, decision `0020`). It is balanced (every area in 16–20 of the 40 questions) and uses questions the student has never been given. Only when fewer than 40 unseen questions are left does it top up with questions seen longest ago, never from the most recent set.
+3. **Latest set is unfinished:** return it unchanged, with its saved answers, so the student resumes.
+
+**Input:** `POST /me/interest-test/rotate` (Phase 9).
+**Actions:** if the latest set is unfinished, mark it discarded and delete its answers. Its question list stays, as "seen" history. Then draw a new set, clear the cached analysis, and return the new set in the same shape as above. A finished set's results are never touched.
 
 **Input:** `PUT /me/interest-answers` with a list of `{question_id, option_id}` pairs.
 **Actions:**
 1. Check the payload has no repeated question id, and every question id and option id is real.
-2. Check each option actually belongs to the question it's paired with -- a mismatched pair (option from a different question) is rejected.
-3. **Merge/upsert (decision `0008`), not a full replace:** each payload item updates the student's existing answer for that question, or inserts a new one. A question the payload leaves out keeps whatever the student answered before -- it's never deleted. This is what lets the client save progress after every single question (Phase 6 "save-as-you-go") without resending everything so far, while a genuine full 20-question retake still behaves like a full replace from the student's point of view (every question is in the payload either way).
-4. A payload doesn't have to cover all 20 questions -- only the questions it mentions are touched. Each interest area's score is worked out from picks made, not from a fixed total (PRD T1), but is only ever computed once **all 20** questions are answered across every save so far (decision `0008`, see Flow 4 step 1g2).
+2. Check each option actually belongs to the question it's paired with -- a mismatched pair (option from a different question) is rejected. Also check every question is in the student's **current set** (Phase 9). A question outside it, or any answer before a set exists, is rejected.
+3. **Merge/upsert (decision `0008`), not a full replace:** each payload item updates the student's existing answer for that question in the current set, or inserts a new one. A question the payload leaves out keeps whatever the student answered before -- it's never deleted. This is what lets the client save progress after every single question (Phase 6 "save-as-you-go") without resending everything so far.
+4. A payload doesn't have to cover all 40 questions -- only the questions it mentions are touched. When the set's 40th answer is saved, the set is marked finished (`completed_at`), and the answers of any older set are deleted: only the newest finished set's answers are kept (rotation PRD section 6). Interest scores only ever come from the latest finished set (decision `0008`, see Flow 4 step 1g2).
 
 **Output:** `200` with the saved `{question_id, option_id}` pairs (only the ones in this payload, not the student's full answer set).
-**On failure:** `400` with a message naming the problem -- a duplicate question id, an unknown question or option id, or an option that doesn't belong to its question.
+**On failure:** `400` with a message naming the problem -- a duplicate question id, an unknown question or option id, an option that doesn't belong to its question, or a question that isn't in the current set.
 
 **Input:** `GET /me/interest-answers` (Phase 6, decision `0008`).
-**Actions:** load every answer the student has saved so far, and compare the count against the total number of questions.
-**Output:** `200` with `{"answers": [{question_id, option_id}, ...], "complete": bool}` -- the student's saved answers (however many so far), and whether all 20 are answered yet. This is what lets the client resume a part-finished test and show progress (e.g. "12 of 20").
+**Actions:** load the answers saved for the student's current set. It never creates a set.
+**Output:** `200` with `{"answers": [{question_id, option_id}, ...], "complete": bool}` -- the current set's saved answers (however many so far), and whether all 40 are answered yet. The Interest Test page uses `GET /me/interest-test` instead, which returns the questions and answers together.
 
 ### 4. Deleting your account cleans up both
 
-`DELETE /me` (Flow 1) removes the student's `spm_results` and `interest_answers` rows automatically, the same way it will for every future student table: the tables point back at `users` with `ON DELETE CASCADE`, so the database removes them as part of deleting the account row -- no extra clean-up code needed.
+`DELETE /me` (Flow 1) removes the student's `spm_results`, `interest_test_sets` (with their question lists), and `interest_answers` rows automatically, the same way it will for every future student table: the tables point back at `users` with `ON DELETE CASCADE`, so the database removes them as part of deleting the account row -- no extra clean-up code needed.
 
 > **Watch out:** `spm_results` and `interest_answers` are keyed to a login, not a name or email. So even the student who "owns" the data can only reach it through their own access token -- there's no route that takes another student's id.
 
@@ -186,18 +193,18 @@ Analysis turns a student's saved SPM (**Sijil Pelajaran Malaysia**) results and 
 2. If there's no cached row, compute fresh:
    a. Load the student's saved `{subject_code: grade}` pairs, and the subject-group each subject belongs to.
    b. Work out **category A or B**: compare the student's `spm_year` to the most recently loaded session's `latest_spm_year`. Same year = category A (this year's SPM leavers); older = category B.
-   c. Load the 9 interest areas, and how many of the interest test's questions can award each area a point (its "max picks").
-   d. Count the student's own picks per area from their saved interest-test answers ("None of the above" answers don't count toward any area).
+   c. Load the 9 interest areas. Find the student's latest **finished** interest test set, and how many of **that set's** 40 questions can award each area a point (its "max picks", rotation PRD T1).
+   d. Count the student's own picks per area from that set's answers ("None of the above" answers don't count toward any area).
    e. Load **syarat am** (general_requirements), the entry rules that apply to every program in this session + category.
    f. Load every program in this session + category, with its own **syarat khas** (program_requirements), and run the eligibility check (Flow 4 step 2's rules) for each one against the student's grades, citizenship, and race.
-   g2. **Interest-test completeness gate (decision `0008`):** compare the student's answered-question count against the total number of questions (20). Interest scores are only ever computed once **all 20** are answered -- a part-finished test's picks so far must never leak into the chart, Best Fit, or a sweet spot. Until then, every Chart 2 score is forced to 0.
+   g2. **Interest-test completeness gate (decision `0008`, per set since Phase 9):** interest scores are only ever computed from a fully answered (40/40) set. With no finished set, every Chart 2 score is forced to 0 -- a part-finished test's picks so far must never leak into the chart, Best Fit, or a sweet spot. A part-finished newer set never changes the chart: the latest finished set's scores stay until the new set is finished.
    g. Compute **Chart 1** (subject-group scores: the mean grade-percent of the subjects the student took in that group; a group with none of its subjects taken is left out entirely, never shown as 0), and **Chart 2** (interest-area scores: picks / max picks, as a percent, only once the interest test is complete -- otherwise every one of the 9 areas is shown at a forced 0%; the 9 areas are always shown either way, never omitted).
    h. Compute **Likely to excel** (top 3 areas by Chart 1's related subject groups; an area is left out if the student has none of its subject groups) and **Likely to love** (top 3 areas by Chart 2's score, **excluding any area that scores 0 interest** -- see decision `0007` -- and forced to empty entirely while the interest test is incomplete -- decision `0008`). Ties are broken by the other list's score, then by area name. Because 0-score areas are excluded, Likely to love can return 0 to 3 areas -- fewer than 3, or empty if the student hasn't taken the interest test, hasn't finished it yet, or picked "None of the above" every time.
    i. **Sweet spot:** any area that appears in both top-3 lists. Since Likely to love can no longer contain a 0-score area, a 0-score area can no longer be a Sweet spot either -- a direct consequence of step h's rule, not a separate check.
    j. **Best Fit:** for every area that appears in *either* top-3 list (the union, not excel-only), show up to 3 of that area's programs -- Eligible ones first, then by name, and only Eligible or Conditional programs, never Not Eligible.
    k. Save the whole result as one row in `analysis` (replacing nothing, since there's no existing row at this point), and return it.
 
-**Output:** `200` with subject-group scores, interest-area scores, Likely to excel, Likely to love, Sweet spot, Best Fit, the category (A/B) used, `computed_at` (when it was worked out), and `interest_test_complete` (whether all 20 interest-test questions are answered yet -- decision `0008`).
+**Output:** `200` with subject-group scores, interest-area scores, Likely to excel, Likely to love, Sweet spot, Best Fit, the category (A/B) used, `computed_at` (when it was worked out), and `interest_test_complete` (whether the student has a fully answered 40-question set -- decision `0008`).
 **On failure:** if the current session has no `general_requirements` row for the student's category (a data problem, not a student mistake -- see the Error States table below), the request fails with a `500` server error rather than a normal eligibility result.
 
 > **Watch out:** a non-citizen student still gets both full charts (PRD T2: "the charts are still shown") -- only Best Fit's program lists come back empty for them, since a non-citizen can never be Eligible or Conditional for any program (a hard stop, checked first). The same "still show charts" rule applies to a Bumiputera-only program mismatch: it only empties that one program out of Best Fit, not the whole response.
@@ -259,11 +266,12 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 ### 5. Interest Test page
 
 **Page:** `pages/InterestTest.jsx`.
-**What it does:** shows all 20 questions as a list of cards. Each option is a tile the student clicks; a picked tile is highlighted.
-1. On load, calls `GET /me/interest-answers` (Flow 3 step 3, decision `0008`) to fetch any answers already saved, and pre-fills them so the student resumes exactly where they left off -- including after closing the tab and coming back later.
+**What it does:** shows the student's 40-question set as a list of cards. Each option is a tile the student clicks; a picked tile is highlighted.
+1. On load, calls `GET /me/interest-test` (Flow 3 step 3) once. It returns the set's questions and any answers already saved, so the student resumes exactly where they left off -- including after closing the tab and coming back later. If the last set was finished, this gives a new set, and an info note says the last results stay on My Results until this set is finished.
 2. Saves each answer immediately after the student picks it, with `PUT /me/interest-answers` sending just that one `{question_id, option_id}` pair. Because that route merges/upserts (decision `0008`) instead of replacing everything, earlier answers are never lost by a later, smaller save.
-3. Shows a live "N of 20 answered" count and a progress bar, pinned just under the top menu while scrolling. Once all 20 are answered, a "You've answered every question" card links to My Results.
-**Resume/completeness rule:** the test only counts as finished once all 20 questions have an answer across every save so far -- there's no separate "submit" step. Until then, `GET /me/analysis` (Flow 4 step 1g2) forces the interest-area chart and Likely to love to empty/0, so the My Results page (step 6 below) shows an unfinished state rather than a misleading partial score.
+3. Shows a live "N of 40 answered" count, a progress bar, and a **Get new questions** button, all pinned just under the top menu while scrolling. Once all 40 are answered, a "You've answered every question" card links to My Results.
+4. **Get new questions** calls `POST /me/interest-test/rotate`. With no answers yet, or a finished set, it swaps right away. Otherwise an inline confirm asks first ("This clears your N answers…"), with "Get new questions" and "Keep these" buttons.
+**Resume/completeness rule:** a set only counts as finished once all 40 questions have an answer across every save so far -- there's no separate "submit" step. Until the student has a finished set, `GET /me/analysis` (Flow 4 step 1g2) forces the interest-area chart and Likely to love to empty/0, so the My Results page (step 6 below) shows an unfinished state rather than a misleading partial score.
 
 ### 6. My Results page
 
@@ -355,7 +363,7 @@ That means the summary automatically inherits Flow 4's existing cache rule (deci
 | `429` Too many requests | More than 5 login or sign-up tries per minute from one IP address | The client asks the student to wait a minute |
 | `404` Program not found | `GET /programs/{code}` with a code not in the current session | The client shows a "not found" message |
 | `400` Bad SPM result save | `PUT /me/results` with a bad grade, a duplicate subject, a missing `BM`/`SJ` row, or an unknown subject code | The client shows the field error and doesn't save |
-| `400` Bad interest-answer save | `PUT /me/interest-answers` with a duplicate question id, an unknown question/option id, or an option that doesn't match its question | The client shows the field error and doesn't save |
+| `400` Bad interest-answer save | `PUT /me/interest-answers` with a duplicate question id, an unknown question/option id, an option that doesn't match its question, or a question outside the student's current set | The client shows the error and doesn't save |
 | `500` Analysis can't be computed | `GET /me/analysis` when the current session has no `general_requirements` row for the student's category -- a reference-data gap, not something the student did wrong | Not caught as a friendly error yet: it surfaces as a generic server error. The client should show a generic "something went wrong, try again later" message. A developer should treat this as a sign the session's data load is incomplete |
 | `200` with `status: "unavailable"` | `GET /me/analysis/summary` when GPT-5 times out (6 seconds), errors, or `OPENAI_API_KEY` is missing/placeholder | Never a `500` (Flow 6 step 1). The client shows "Summary unavailable right now." The charts from `GET /me/analysis` are unaffected either way |
 
@@ -384,13 +392,15 @@ That means the summary automatically inherits Flow 4's existing cache rule (deci
 - The reference-data routes (`/subjects`, `/universities`, `/programs`, `/programs/{code}`) need no login and read only the most recently loaded session.
 - The importer only fetches one page at a time -- it never runs requests to e-Panduan in parallel.
 - `PUT /me/results` is **upsert-only**: it never deletes a subject the payload leaves out. To remove a saved subject, a future route would need to add that on purpose.
-- `PUT /me/interest-answers` is a **merge/upsert** (decision `0008`): each save updates only the questions it mentions, leaving every other previously-saved answer untouched. A full 20-question payload still ends up replacing the student's whole answer set, since every question is covered either way.
-- `GET /me/analysis`'s interest-area chart, Likely to love, and any interest-driven sweet spot are only ever computed once all 20 interest-test questions are answered (decision `0008`); until then they're forced to 0/empty regardless of how many (or which) questions have been answered so far.
+- `PUT /me/interest-answers` is a **merge/upsert** (decision `0008`): each save updates only the questions it mentions, leaving every other previously-saved answer untouched. Only questions in the student's current set are accepted.
+- `GET /me/analysis`'s interest-area chart, Likely to love, and any interest-driven sweet spot are only ever computed from the student's latest fully answered (40/40) set (decision `0008`, rotation PRD T1); with no finished set they're forced to 0/empty regardless of how many (or which) questions have been answered so far.
+- A student has at most one unfinished set at a time. A new set never repeats a question the student has been given until fewer than 40 unseen questions are left (rotation PRD T3).
+- Answers are kept only for the current set and the latest finished set. Rotating deletes the unfinished set's answers; finishing a set deletes older sets' answers.
 - `PUT /me/results` and `PUT /me/interest-answers` both delete the student's cached `analysis` row on every successful save, unconditionally -- there's no check for whether the save actually changed anything (decision `0006`).
 - `GET /me/analysis` only ever computes for, caches, and returns the logged-in student's own data -- the same access-token scoping as every other `/me` route.
 - `GET /me/analysis/summary` sends GPT-5 only interest-area and subject-group names + scores -- never email, race, citizenship, raw grades, or a user id (decision `0010`). It never returns a `500`: any AI failure becomes `status: "unavailable"` instead.
 - `GET /me/analysis/summary` shares `GET /me/analysis`'s cached `analysis` row and its invalidation rule (decision `0006`, decision `0011`) -- there's no separate cache or separate invalidation path for the summary.
-- The AI summary is never computed until the interest test is fully (20/20) answered and at least one SPM result is saved -- the same "enough data" bar `GET /me/analysis`'s charts already use.
+- The AI summary is never computed until the student has a fully (40/40) answered interest test set and at least one SPM result is saved -- the same "enough data" bar `GET /me/analysis`'s charts already use.
 
 ## Related Documents
 

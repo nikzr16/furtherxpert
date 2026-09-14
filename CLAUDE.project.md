@@ -16,7 +16,8 @@ When guidance conflicts:
 
 **FurtherXpert** helps Malaysian SPM holders see what they will
 **likely excel in** (from SPM grades) and **likely love most** (from a
-20-question interest test), shown as two spider charts, plus the **UA diploma
+40-question interest test drawn per student from a 300-question bank, with a
+rotate button), shown as two spider charts, plus the **UA diploma
 programs** they qualify for under official **UPU** rules (syarat am + syarat khas).
 
 The single source of truth for behaviour is `docs/prd/furtherxpert-prd.md`

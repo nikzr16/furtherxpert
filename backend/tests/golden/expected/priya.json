@@ -1,5 +1,5 @@
 {
-  "_derivation": "Grade -> points -> percent as in amir.json. ARTS = mean(PSV A=88.889%, BU A-=77.778%, RBG B+=66.667%) = 233.333/3 = 77.778 -> 77.8. HUMANITIES = SJ C alone = 33.333 -> 33.3. LANGUAGES = mean(BM B=55.556%, BI B=55.556%) = 55.6. Arts & Design excel = ARTS alone = 77.8. Media & Communications excel = mean(LANGUAGES=55.6, ARTS=77.8) = 66.7. Hospitality & Tourism excel = LANGUAGES alone (Priya has no COMMERCE subjects) = 55.6. love: Arts & Design picks=4/9=44.4, Media & Communications picks=2/9=22.2, all other areas 0. All numbers here match the orchestrator's hand-derived draft exactly -- no discrepancy found for Priya. RULE CHANGE (decision 0007): 'Likely to love' now excludes any area scoring 0 interest before taking the top 3, so it can return 0-3 areas. Priya's old love list was [Arts & Design 44.4, Media & Communications 22.2, Hospitality & Tourism 0.0] -- the last entry is 0-score filler. Under the new rule it is dropped, leaving likely_to_love = [Arts & Design 44.4, Media & Communications 22.2] (2 items). Hospitality & Tourism is unaffected in likely_to_excel (excel never filters by zero, still #3 there at 55.6), but it drops out of sweet_spots because it's no longer in the (now-filtered) love list: sweet_spots = [Arts & Design, Media & Communications] only. PHASE 6 ADDENDUM (decision 0008): interest scores are now only computed once all 20 interest-test questions are answered. This student's interest_picks in students.json were padded with 'None of the above' for every previously-unanswered question (contributing 0 picks to any area), so every number in this file is unchanged from before -- only the new interest_test_complete field was added, reflecting that the test is now genuinely complete.",
+  "_derivation": "Grade -> points -> percent as in amir.json. ARTS = mean(PSV A=88.889%, BU A-=77.778%, RBG B+=66.667%) = 233.333/3 = 77.778 -> 77.8. HUMANITIES = SJ C alone = 33.333 -> 33.3. LANGUAGES = mean(BM B=55.556%, BI B=55.556%) = 55.6. Arts & Design excel = ARTS alone = 77.8. Media & Communications excel = mean(LANGUAGES=55.6, ARTS=77.8) = 66.7. Hospitality & Tourism excel = LANGUAGES alone (Priya has no COMMERCE subjects) = 55.6. love: Arts & Design picks=4/9=44.4, Media & Communications picks=2/9=22.2, all other areas 0. All numbers here match the orchestrator's hand-derived draft exactly -- no discrepancy found for Priya. RULE CHANGE (decision 0007): 'Likely to love' now excludes any area scoring 0 interest before taking the top 3, so it can return 0-3 areas. Priya's old love list was [Arts & Design 44.4, Media & Communications 22.2, Hospitality & Tourism 0.0] -- the last entry is 0-score filler. Under the new rule it is dropped, leaving likely_to_love = [Arts & Design 44.4, Media & Communications 22.2] (2 items). Hospitality & Tourism is unaffected in likely_to_excel (excel never filters by zero, still #3 there at 55.6), but it drops out of sweet_spots because it's no longer in the (now-filtered) love list: sweet_spots = [Arts & Design, Media & Communications] only. PHASE 6 ADDENDUM (decision 0008): interest scores are now only computed once all 20 interest-test questions are answered. This student's interest_picks in students.json were padded with 'None of the above' for every previously-unanswered question (contributing 0 picks to any area), so every number in this file is unchanged from before -- only the new interest_test_complete field was added, reflecting that the test is now genuinely complete. PHASE 9 ADDENDUM (rotation PRD T1, intended rule change): fixed 40-question set (bank questions 1-40); 'most picks possible' now comes from that set. Picks unchanged (questions 21-40 answered 'None of the above'). Arts & Design is offered by 18 questions in the set (9 + 9: 22, 24, 25, 27, 30, 31, 32, 34, 39) -> 4/18*100 = 22.222 -> 22.2 (was 44.4). Media & Communications is offered by 17 (9 + 8: 22, 26, 28, 29, 34, 35, 36, 38) -> 2/17*100 = 11.765 -> 11.8 (was 22.2). Order and lists unchanged: likely_to_love = [Arts & Design 22.2, Media & Communications 11.8]; sweet_spots still [Arts & Design, Media & Communications].",
   "subject_groups": {
     "ARTS": 77.8,
     "HUMANITIES": 33.3,
@@ -10,11 +10,11 @@
     "Business & Management": 0.0,
     "Law & Governance": 0.0,
     "Healthcare & Social Services": 0.0,
-    "Arts & Design": 44.4,
+    "Arts & Design": 22.2,
     "Education & Humanities": 0.0,
     "Hospitality & Tourism": 0.0,
     "Agriculture & Environment": 0.0,
-    "Media & Communications": 22.2
+    "Media & Communications": 11.8
   },
   "likely_to_excel": [
     ["Arts & Design", 77.8],
@@ -22,8 +22,8 @@
     ["Hospitality & Tourism", 55.6]
   ],
   "likely_to_love": [
-    ["Arts & Design", 44.4],
-    ["Media & Communications", 22.2]
+    ["Arts & Design", 22.2],
+    ["Media & Communications", 11.8]
   ],
   "sweet_spots": ["Arts & Design", "Media & Communications"],
   "category": "B",

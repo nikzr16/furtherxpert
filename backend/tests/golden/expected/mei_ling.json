@@ -1,5 +1,5 @@
 {
-  "_derivation": "Same results and interest answers as Amir, with only race changed (Melayu -> Cina). Race must never affect the scoring/chart pure functions (app/services/scoring.py), so every chart field below is byte-for-byte identical to expected/amir.json. See amir.json's _derivation for the corrected HUMANITIES/LANGUAGES values (the same correction applies here for the same reason). The test asserts both against this static file AND directly against Amir's live response body, so any accidental race-based divergence in either direction is caught. RULE CHANGE (decision 0007): 'Likely to love' now excludes any area scoring 0 interest before taking the top 3, so it can return 0-3 areas. Identical to Amir's change for the identical reason (same interest picks, race-independent scoring): likely_to_love = [Science & Technology 100.0] only (Media & Communications and Agriculture & Environment dropped as 0-score filler), sweet_spots = [Science & Technology] only (the other two drop out of the intersection since they're no longer in love, even though they're still in likely_to_excel). Still byte-for-byte identical to amir.json. PHASE 6 ADDENDUM (decision 0008): interest scores are now only computed once all 20 interest-test questions are answered. This student's interest_picks in students.json were padded with 'None of the above' for every previously-unanswered question (contributing 0 picks to any area), so every number in this file is unchanged from before -- only the new interest_test_complete field was added, reflecting that the test is now genuinely complete.",
+  "_derivation": "Same results and interest answers as Amir, with only race changed (Melayu -> Cina). Race must never affect the scoring/chart pure functions (app/services/scoring.py), so every chart field below is byte-for-byte identical to expected/amir.json. See amir.json's _derivation for the corrected HUMANITIES/LANGUAGES values (the same correction applies here for the same reason). The test asserts both against this static file AND directly against Amir's live response body, so any accidental race-based divergence in either direction is caught. RULE CHANGE (decision 0007): 'Likely to love' now excludes any area scoring 0 interest before taking the top 3, so it can return 0-3 areas. Identical to Amir's change for the identical reason (same interest picks, race-independent scoring): likely_to_love = [Science & Technology 100.0] only (Media & Communications and Agriculture & Environment dropped as 0-score filler), sweet_spots = [Science & Technology] only (the other two drop out of the intersection since they're no longer in love, even though they're still in likely_to_excel). Still byte-for-byte identical to amir.json. PHASE 6 ADDENDUM (decision 0008): interest scores are now only computed once all 20 interest-test questions are answered. This student's interest_picks in students.json were padded with 'None of the above' for every previously-unanswered question (contributing 0 picks to any area), so every number in this file is unchanged from before -- only the new interest_test_complete field was added, reflecting that the test is now genuinely complete. PHASE 9 ADDENDUM (rotation PRD T1, intended rule change): same fixed 40-question set and same picks as Amir, so the same change applies: Science & Technology love = 9/18*100 = 50.0 (see amir.json). Still identical to amir.json.",
   "subject_groups": {
     "COMMERCE": 33.3,
     "HUMANITIES": 88.9,
@@ -9,7 +9,7 @@
     "TECHNICAL_ICT": 100.0
   },
   "interest_areas": {
-    "Science & Technology": 100.0,
+    "Science & Technology": 50.0,
     "Business & Management": 0.0,
     "Law & Governance": 0.0,
     "Healthcare & Social Services": 0.0,
@@ -25,7 +25,7 @@
     ["Agriculture & Environment", 92.6]
   ],
   "likely_to_love": [
-    ["Science & Technology", 100.0]
+    ["Science & Technology", 50.0]
   ],
   "sweet_spots": ["Science & Technology"],
   "category": "A",

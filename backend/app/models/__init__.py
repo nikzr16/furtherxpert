@@ -2,7 +2,13 @@
 
 from app.models.analysis import Analysis  # noqa: F401
 from app.models.interest_area import InterestArea  # noqa: F401
-from app.models.interest_test import InterestAnswer, InterestOption, InterestQuestion  # noqa: F401
+from app.models.interest_test import (  # noqa: F401
+    InterestAnswer,
+    InterestOption,
+    InterestQuestion,
+    InterestTestSet,
+    InterestTestSetQuestion,
+)
 from app.models.program import Campus, Program  # noqa: F401
 from app.models.requirement import GeneralRequirement, ProgramRequirement  # noqa: F401
 from app.models.session import Session  # noqa: F401

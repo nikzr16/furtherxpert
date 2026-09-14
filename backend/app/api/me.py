@@ -11,7 +11,12 @@ from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.user import User
 from app.schemas.analysis import AnalysisOut, AnalysisSummaryOut
-from app.schemas.interest_test import InterestAnswerIn, InterestAnswerOut, InterestAnswersProgressOut
+from app.schemas.interest_test import (
+    InterestAnswerIn,
+    InterestAnswerOut,
+    InterestAnswersProgressOut,
+    InterestTestSetOut,
+)
 from app.schemas.spm_result import SPMResultIn, SPMResultOut
 from app.schemas.user import UserPublic
 from app.services import analysis as analysis_service
@@ -63,6 +68,22 @@ def replace_my_results(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/me/interest-test", response_model=InterestTestSetOut)
+def read_my_interest_test(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return interest_test_service.get_or_create_current_set(db, current_user.id)
+
+
+@router.post("/me/interest-test/rotate", response_model=InterestTestSetOut)
+def rotate_my_interest_test(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return interest_test_service.rotate_set(db, current_user.id)
+
+
 @router.get("/me/interest-answers", response_model=InterestAnswersProgressOut)
 def read_my_interest_answers(
     current_user: User = Depends(get_current_user),
@@ -84,6 +105,7 @@ def save_my_interest_answers(
         interest_test_service.UnknownQuestionError,
         interest_test_service.UnknownOptionError,
         interest_test_service.OptionQuestionMismatchError,
+        interest_test_service.QuestionNotInSetError,
     ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

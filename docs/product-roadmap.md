@@ -109,6 +109,15 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 |---|---|---|---|
 | `docs/prd/ui-redesign-prd.md` | `client/src/` | in-progress | Code committed 2026-09-14 (`9fe75b1`), client files only. Built before its PRD and plan, which were written afterwards (decision `0015`). New shared look (`components/ui.jsx`, `index.css`), sticky menu with a phone menu, footer, 404 page, every page rebuilt, program names in title case (decision `0016`), and spider charts that show scores at each spoke instead of scale numbers (decision `0017`). The "View as a table" toggle under each chart was then removed from view; the table stays for screen readers (decision `0018`). The "excel" chart now always shows all 7 subject groups, with N/A for groups with no subjects; display only, no backend change (decision `0019`). **Checked:** `npm run build` passes; lint shows no new warnings; Home, Log in, Register, Explore and Program Detail were checked in a browser at about 700px and 1200px wide; My Results, including both charts with real data, at about 700px wide (one bug fixed: eligibility pills stretched full width). **Still open:** a browser check of SPM Results, Interest Test and Account; My Results at laptop width; a 375px phone check; the 404 page; a keyboard walk-through; reviewer sign-off |
 
+### Phase 9: Interest test rotation
+
+**Trigger:** the product owner asked for a 300-question bank with 40-question sets and a rotate button, and agreed the PRD and plan (2026-09-14).
+**Graduation criteria:** acceptance criteria 1–12 in `docs/prd/interest-test-rotation-prd.md` pass, and steps 9.1–9.4 in `docs/plan/interest-test-rotation-plan.md` are done.
+
+| PRD | Module | Status | Notes |
+|---|---|---|---|
+| `docs/prd/interest-test-rotation-prd.md` | `backend/data/`, `backend/app/`, `backend/migrations/`, `client/src/` | in-progress | PRD and plan agreed 2026-09-14. Built the same day, not yet committed. **Question bank:** 280 new questions (300 total), every area tagged 133 or 134 times. The product owner handed their review to the assistant (decision `0021`). **Backend:** per-student 40-question sets, `GET /me/interest-test`, `POST /me/interest-test/rotate`, scores from the latest finished set, public `GET /interest-test` removed (decision `0020`). **Page:** "N of 40", Get new questions with confirm, fresh-set note; Home says 40. **Checked:** 152 backend tests pass (up from 126), including golden numbers re-worked by hand; migrations applied to the dev database (300 questions); a live API run with a throwaway account (open, resume, rotate with no repeats, finish, new set keeps results, account deleted); `npm run build` passes; lint shows no new warnings. **Still open:** a by-hand browser check of the Interest Test page at phone and laptop width (needs the product owner to log in), and reviewer sign-off |
+
 ## Cross-Cutting Concerns
 
 | Concern | Introduced In | Matured In | Current State |
@@ -126,6 +135,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 |---|---|---|---|
 | `docs/prd/furtherxpert-prd.md` (plan: `docs/plan/furtherxpert-plan.md`) | 1–7 | `backend/`, `client/` | shipped |
 | `docs/prd/ui-redesign-prd.md` (plan: `docs/plan/ui-redesign-plan.md`) | 8 | `client/` | in-progress |
+| `docs/prd/interest-test-rotation-prd.md` (plan: `docs/plan/interest-test-rotation-plan.md`) | 9 | `backend/`, `client/` | in-progress |
 
 ## Prioritization Log
 
@@ -134,6 +144,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 | 2026-09-12 | Set the 7-phase order | Each phase relies on the one before it |
 | 2026-09-12 | Added the implementation plan before Phase 3 | Phases 1–2 were built from the PRD alone; from Phase 3 on, builds follow the plan |
 | 2026-09-14 | Added Phase 8, UI redesign | The product owner wanted a production-quality look before wider rollout. Its PRD and plan were written after the build (decision `0015`) |
+| 2026-09-14 | Added Phase 9, Interest test rotation | Retakes showed the same 20 questions. The product owner wants a 300-question bank, 40-question sets, and a rotate button |
 
 ## Later (not in the first release)
 

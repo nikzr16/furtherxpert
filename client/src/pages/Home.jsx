@@ -25,7 +25,7 @@ const STEPS = [
   {
     icon: 'heart',
     title: 'Take the interest test',
-    body: 'Answer 20 quick questions. Every answer saves as you go, so you can stop and come back anytime.',
+    body: 'Answer 40 quick questions. Every answer saves as you go, so you can stop and come back anytime.',
   },
   {
     icon: 'chartBar',
@@ -128,7 +128,7 @@ export default function Home() {
             </div>
 
             <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
-              {['Official UPU entry rules', '20-question interest test', 'Browse without an account'].map((item) => (
+              {['Official UPU entry rules', '40-question interest test', 'Browse without an account'].map((item) => (
                 <li key={item} className="flex items-center gap-2">
                   <Icon name="checkCircle" className="size-4 text-emerald-500" />
                   {item}
@@ -148,7 +148,7 @@ export default function Home() {
             <Stat value={stats.programs} label="Diploma programs" />
             <Stat value={stats.universities} label="Public universities" />
             <Stat value={9} label="Interest areas" />
-            <Stat value={20} label="Test questions" />
+            <Stat value={40} label="Test questions" />
           </dl>
         </section>
       )}

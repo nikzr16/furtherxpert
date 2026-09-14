@@ -1,5 +1,5 @@
 """API tests for student input (PRD T1, T2, T6; plan Phase 4 Check):
-`GET/PUT /me/results`, `GET /interest-test`, `PUT /me/interest-answers`.
+`GET/PUT /me/results`, `GET/PUT /me/interest-answers`.
 
 Runs against the real, separate test database (see `tests/conftest.py`),
 already migrated with the reference-data (subjects) and the seeded interest
@@ -148,30 +148,16 @@ def test_results_require_auth(client):
     assert resp.status_code in (401, 403)
 
 
-# --- GET /interest-test -----------------------------------------------------
-
-
-def test_read_interest_test_shape_and_no_area_leak(client):
-    resp = client.get("/interest-test")
-    assert resp.status_code == 200
-    questions = resp.json()
-    assert len(questions) == 20
-
-    for question in questions:
-        assert set(question.keys()) == {"id", "text", "options"}
-        # 4 tagged options + "None of the above" == 5.
-        assert len(question["options"]) == 5
-        for option in question["options"]:
-            assert set(option.keys()) == {"id", "text"}
-        assert any(option["text"] == "None of the above" for option in question["options"])
-
-
 # --- PUT /me/interest-answers ------------------------------------------------
+# (The question set itself is covered in tests/test_interest_sets.py.)
 
 
-def _first_two_questions_with_options(client) -> list[dict]:
-    questions = client.get("/interest-test").json()
-    return questions[:2]
+def _set_questions(client, token) -> list[dict]:
+    return client.get("/me/interest-test", headers=_auth(token)).json()["questions"]
+
+
+def _first_two_questions_with_options(client, token) -> list[dict]:
+    return _set_questions(client, token)[:2]
 
 
 def test_put_interest_answers_happy_path_and_partial_saves_merge(client, make_register_payload, db_session):
@@ -180,7 +166,7 @@ def test_put_interest_answers_happy_path_and_partial_saves_merge(client, make_re
     question's previously-saved answer, and re-sending a question must
     update it in place."""
     _, token, user_id = _register_and_login(client, make_register_payload)
-    q1, q2 = _first_two_questions_with_options(client)
+    q1, q2 = _first_two_questions_with_options(client, token)
 
     first_payload = [
         {"question_id": q1["id"], "option_id": q1["options"][0]["id"]},
@@ -208,7 +194,7 @@ def test_put_interest_answers_happy_path_and_partial_saves_merge(client, make_re
 
 def test_put_interest_answers_rejects_unknown_question_id(client, make_register_payload):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1 = _first_two_questions_with_options(client)[0]
+    q1 = _first_two_questions_with_options(client, token)[0]
 
     resp = client.put(
         "/me/interest-answers",
@@ -220,7 +206,7 @@ def test_put_interest_answers_rejects_unknown_question_id(client, make_register_
 
 def test_put_interest_answers_rejects_unknown_option_id(client, make_register_payload):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1 = _first_two_questions_with_options(client)[0]
+    q1 = _first_two_questions_with_options(client, token)[0]
 
     resp = client.put(
         "/me/interest-answers",
@@ -232,7 +218,7 @@ def test_put_interest_answers_rejects_unknown_option_id(client, make_register_pa
 
 def test_put_interest_answers_rejects_option_from_another_question(client, make_register_payload):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1, q2 = _first_two_questions_with_options(client)
+    q1, q2 = _first_two_questions_with_options(client, token)
 
     resp = client.put(
         "/me/interest-answers",
@@ -245,7 +231,7 @@ def test_put_interest_answers_rejects_option_from_another_question(client, make_
 
 def test_put_interest_answers_rejects_duplicate_question_in_payload(client, make_register_payload):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1 = _first_two_questions_with_options(client)[0]
+    q1 = _first_two_questions_with_options(client, token)[0]
 
     resp = client.put(
         "/me/interest-answers",
@@ -261,7 +247,7 @@ def test_put_interest_answers_rejects_duplicate_question_in_payload(client, make
 def test_interest_answers_are_scoped_to_the_caller(client, make_register_payload, db_session):
     _, token_a, user_id_a = _register_and_login(client, make_register_payload)
     _, token_b, user_id_b = _register_and_login(client, make_register_payload)
-    q1 = _first_two_questions_with_options(client)[0]
+    q1 = _first_two_questions_with_options(client, token_a)[0]
 
     resp_a = client.put(
         "/me/interest-answers",
@@ -298,7 +284,7 @@ def test_get_interest_answers_empty_when_none_saved(client, make_register_payloa
 
 def test_get_interest_answers_resumes_a_partial_save(client, make_register_payload):
     _, token, _ = _register_and_login(client, make_register_payload)
-    q1, q2 = _first_two_questions_with_options(client)
+    q1, q2 = _first_two_questions_with_options(client, token)
 
     payload = [
         {"question_id": q1["id"], "option_id": q1["options"][0]["id"]},
@@ -307,7 +293,7 @@ def test_get_interest_answers_resumes_a_partial_save(client, make_register_paylo
     put_resp = client.put("/me/interest-answers", json=payload, headers=_auth(token))
     assert put_resp.status_code == 200
 
-    # A part-finished test (only 2 of 20 answered) must resume with exactly
+    # A part-finished test (only 2 of 40 answered) must resume with exactly
     # those saved answers, and `complete` must be false.
     get_resp = client.get("/me/interest-answers", headers=_auth(token))
     assert get_resp.status_code == 200
@@ -319,19 +305,19 @@ def test_get_interest_answers_resumes_a_partial_save(client, make_register_paylo
     }
 
 
-def test_get_interest_answers_complete_once_all_20_answered(client, make_register_payload):
+def test_get_interest_answers_complete_once_all_40_answered(client, make_register_payload):
     _, token, _ = _register_and_login(client, make_register_payload)
-    questions = client.get("/interest-test").json()
-    assert len(questions) == 20
+    questions = _set_questions(client, token)
+    assert len(questions) == 40
 
-    # Answer 19 of 20 first -- still incomplete.
-    partial_payload = [{"question_id": q["id"], "option_id": q["options"][0]["id"]} for q in questions[:19]]
+    # Answer 39 of 40 first -- still incomplete.
+    partial_payload = [{"question_id": q["id"], "option_id": q["options"][0]["id"]} for q in questions[:39]]
     resp = client.put("/me/interest-answers", json=partial_payload, headers=_auth(token))
     assert resp.status_code == 200
     assert client.get("/me/interest-answers", headers=_auth(token)).json()["complete"] is False
 
     # Answer the last one -- now complete.
-    last = questions[19]
+    last = questions[39]
     resp = client.put(
         "/me/interest-answers",
         json=[{"question_id": last["id"], "option_id": last["options"][0]["id"]}],
@@ -340,7 +326,7 @@ def test_get_interest_answers_complete_once_all_20_answered(client, make_registe
     assert resp.status_code == 200
     body = client.get("/me/interest-answers", headers=_auth(token)).json()
     assert body["complete"] is True
-    assert len(body["answers"]) == 20
+    assert len(body["answers"]) == 40
 
 
 def test_interest_answers_progress_requires_auth(client):
@@ -353,7 +339,7 @@ def test_interest_answers_progress_requires_auth(client):
 
 def test_delete_me_cascades_results_and_interest_answers(client, make_register_payload, db_session):
     _, token, user_id = _register_and_login(client, make_register_payload)
-    q1 = _first_two_questions_with_options(client)[0]
+    q1 = _first_two_questions_with_options(client, token)[0]
 
     put_results = client.put(
         "/me/results",

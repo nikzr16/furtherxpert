@@ -1,37 +1,44 @@
-"""The interest test: the public question list, and a student's answers
-(PRD T1, T6; plan Phase 4 tasks 1, 3, 4).
+"""The interest test: a student's question set, rotation, and answers
+(PRD T1, T6; rotation PRD `docs/prd/interest-test-rotation-prd.md` T2-T3;
+rotation plan Processing Flows A, B, D).
 
-`list_questions` returns full ORM rows (options included, `id` order =
-seeded order) for `app/api/interest_test.py` to serialize through
-`InterestQuestionPublic` / `InterestOptionPublic`, which carry no area --
-`GET /interest-test` must not leak which option maps to which area (PRD T6).
+- `get_or_create_current_set` backs `GET /me/interest-test`. It returns the
+  student's latest set, or draws a new one when there is none or the latest
+  one is finished. A part-finished set is always resumed.
+- `rotate_set` backs `POST /me/interest-test/rotate`. It throws away an
+  unfinished set (its answers are deleted, its question list is kept as
+  "seen" history) and draws a new one.
+- `save_answers` backs `PUT /me/interest-answers`. It is a **merge/upsert**
+  (decision `0008`): a question the payload leaves out keeps its saved
+  answer. Only questions in the current set are accepted. When the 40th
+  answer lands, the set is marked finished and the answers of any older set
+  are deleted (rotation PRD section 6: keep only the answers still needed).
+- `get_progress` backs `GET /me/interest-answers`. It never creates a set.
 
-`save_answers` (PRD T6 `PUT /me/interest-answers`; Phase 6 plan task) is a
-**merge/upsert**, not a full replace: each item in the payload updates the
-student's existing answer for that question, or inserts a new one -- a
-question the payload leaves out keeps whatever the student answered before
-(decision `0008`). This is what lets the client save progress as it goes
-(plan Phase 6 task 2 "Interest Test... saves progress as-you-go") without
-re-sending all 20 answers on every save, and lets a genuine retake of one
-question happen without disturbing the rest. A payload does not have to
-cover all 20 questions; whether the *stored* answer set (after the merge)
-covers all 20 is what `get_progress`'s `complete` flag, and the
-`GET /me/analysis` completeness gate (`app/services/analysis.py`), check.
-
-`get_progress` backs the new `GET /me/interest-answers` (Phase 6): it
-returns the student's saved answers so far plus whether all 20 questions
-are answered yet, so the client can resume a part-finished test and show
-progress (e.g. "12 of 20").
+The public responses never carry an option's area (PRD T6).
 """
 
+import logging
+import random
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session as DbSession, selectinload
 
 from app.models.analysis import Analysis
-from app.models.interest_test import InterestAnswer, InterestOption, InterestQuestion
+from app.models.interest_test import (
+    InterestAnswer,
+    InterestOption,
+    InterestQuestion,
+    InterestTestSet,
+    InterestTestSetQuestion,
+)
+from app.models.user import User
 from app.schemas.interest_test import InterestAnswerIn
+from app.services.question_sets import draw_set, is_balanced
+
+logger = logging.getLogger(__name__)
 
 
 class DuplicateQuestionError(Exception):
@@ -58,12 +65,119 @@ class OptionQuestionMismatchError(Exception):
         super().__init__(f"Option(s) do not belong to their question: {pairs}")
 
 
-def list_questions(db: DbSession) -> list[InterestQuestion]:
-    return list(
+class QuestionNotInSetError(Exception):
+    def __init__(self, ids: set[int]) -> None:
+        self.ids = sorted(ids)
+        super().__init__(f"Question(s) not in your current interest test set: {self.ids}")
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _lock_user(db: DbSession, user_id: uuid.UUID) -> None:
+    """Row-lock the student so two tabs can't create two sets at once."""
+    db.execute(select(User.id).where(User.id == user_id).with_for_update())
+
+
+def _latest_set(db: DbSession, user_id: uuid.UUID) -> InterestTestSet | None:
+    return db.execute(
+        select(InterestTestSet)
+        .where(InterestTestSet.user_id == user_id)
+        .order_by(InterestTestSet.id.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
+def _create_set(db: DbSession, user_id: uuid.UUID) -> InterestTestSet:
+    question_areas: dict[int, set[int]] = {}
+    for question_id, area_id in db.execute(
+        select(InterestOption.question_id, InterestOption.area_id).where(InterestOption.area_id.isnot(None))
+    ):
+        question_areas.setdefault(question_id, set()).add(area_id)
+
+    past_sets = [
+        [row.question_id for row in past.questions]
+        for past in db.execute(
+            select(InterestTestSet)
+            .where(InterestTestSet.user_id == user_id)
+            .options(selectinload(InterestTestSet.questions))
+            .order_by(InterestTestSet.id)
+        ).scalars()
+    ]
+
+    question_ids = draw_set(question_areas, past_sets, random.Random())
+    if not is_balanced(question_ids, question_areas):
+        # No student data in the log: only that the balance range was missed.
+        logger.warning("Drew an interest test set outside the per-area balance range")
+
+    new_set = InterestTestSet(user_id=user_id)
+    db.add(new_set)
+    db.flush()
+    for position, question_id in enumerate(question_ids, start=1):
+        db.add(InterestTestSetQuestion(set_id=new_set.id, position=position, question_id=question_id))
+    db.flush()
+    return new_set
+
+
+def _set_payload(db: DbSession, test_set: InterestTestSet) -> dict:
+    questions = list(
         db.execute(
-            select(InterestQuestion).options(selectinload(InterestQuestion.options)).order_by(InterestQuestion.n)
+            select(InterestQuestion)
+            .join(InterestTestSetQuestion, InterestTestSetQuestion.question_id == InterestQuestion.id)
+            .where(InterestTestSetQuestion.set_id == test_set.id)
+            .options(selectinload(InterestQuestion.options))
+            .order_by(InterestTestSetQuestion.position)
         ).scalars()
     )
+    answers = [
+        {"question_id": row.question_id, "option_id": row.chosen_option_id}
+        for row in db.execute(select(InterestAnswer).where(InterestAnswer.set_id == test_set.id)).scalars()
+    ]
+    has_finished_set = (
+        db.execute(
+            select(func.count())
+            .select_from(InterestTestSet)
+            .where(
+                InterestTestSet.user_id == test_set.user_id,
+                InterestTestSet.completed_at.isnot(None),
+                InterestTestSet.id != test_set.id,
+            )
+        ).scalar_one()
+        > 0
+    )
+    return {
+        "set_id": test_set.id,
+        "questions": questions,
+        "answers": answers,
+        "answered": len(answers),
+        "total": len(questions),
+        "complete": test_set.completed_at is not None,
+        "has_finished_set": has_finished_set,
+    }
+
+
+def get_or_create_current_set(db: DbSession, user_id: uuid.UUID) -> dict:
+    _lock_user(db, user_id)
+    current = _latest_set(db, user_id)
+    if current is None or current.completed_at is not None:
+        current = _create_set(db, user_id)
+    payload = _set_payload(db, current)
+    db.commit()
+    return payload
+
+
+def rotate_set(db: DbSession, user_id: uuid.UUID) -> dict:
+    _lock_user(db, user_id)
+    current = _latest_set(db, user_id)
+    if current is not None and current.completed_at is None:
+        current.discarded_at = _now()
+        db.execute(delete(InterestAnswer).where(InterestAnswer.set_id == current.id))
+    new_set = _create_set(db, user_id)
+    db.execute(delete(Analysis).where(Analysis.user_id == user_id))
+    payload = _set_payload(db, new_set)
+    db.commit()
+    return payload
 
 
 def save_answers(db: DbSession, user_id: uuid.UUID, items: list[InterestAnswerIn]) -> list[dict]:
@@ -99,16 +213,28 @@ def save_answers(db: DbSession, user_id: uuid.UUID, items: list[InterestAnswerIn
         if mismatched:
             raise OptionQuestionMismatchError(mismatched)
 
-    # Merge/upsert (decision 0008): update the student's existing answer for
-    # a payload question, insert a new row otherwise. A question the
-    # payload leaves out keeps its previously-saved answer untouched -- this
-    # is what makes save-as-you-go / partial saves possible.
-    if items:
+        current = _latest_set(db, user_id)
+        set_question_ids = (
+            set(
+                db.execute(
+                    select(InterestTestSetQuestion.question_id).where(InterestTestSetQuestion.set_id == current.id)
+                ).scalars()
+            )
+            if current is not None
+            else set()
+        )
+        outside_set = question_id_set - set_question_ids
+        if outside_set:
+            raise QuestionNotInSetError(outside_set)
+
+        # Merge/upsert (decision 0008): update the saved answer for a payload
+        # question, insert a new row otherwise. A question the payload leaves
+        # out keeps its previously saved answer.
         existing = {
             row.question_id: row
             for row in db.execute(
                 select(InterestAnswer).where(
-                    InterestAnswer.user_id == user_id,
+                    InterestAnswer.set_id == current.id,
                     InterestAnswer.question_id.in_(question_id_set),
                 )
             ).scalars()
@@ -116,13 +242,31 @@ def save_answers(db: DbSession, user_id: uuid.UUID, items: list[InterestAnswerIn
         for item in items:
             row = existing.get(item.question_id)
             if row is None:
-                db.add(InterestAnswer(user_id=user_id, question_id=item.question_id, chosen_option_id=item.option_id))
+                db.add(
+                    InterestAnswer(
+                        user_id=user_id,
+                        set_id=current.id,
+                        question_id=item.question_id,
+                        chosen_option_id=item.option_id,
+                    )
+                )
             else:
                 row.chosen_option_id = item.option_id
+        db.flush()
 
-        # Invalidate the cached analysis (Phase 5): a changed answer set
-        # means the cached scores/Best Fit are stale, so the next
-        # `GET /me/analysis` must recompute (PRD T5).
+        answered = db.execute(
+            select(func.count()).select_from(InterestAnswer).where(InterestAnswer.set_id == current.id)
+        ).scalar_one()
+        if current.completed_at is None and answered >= len(set_question_ids):
+            current.completed_at = _now()
+            # Only the newest finished set's answers are still needed
+            # (rotation PRD section 6). Discarded sets' answers are already gone.
+            db.execute(
+                delete(InterestAnswer).where(InterestAnswer.user_id == user_id, InterestAnswer.set_id != current.id)
+            )
+
+        # Invalidate the cached analysis (Phase 5): the next
+        # `GET /me/analysis` recomputes (PRD T5).
         db.execute(delete(Analysis).where(Analysis.user_id == user_id))
     db.commit()
 
@@ -130,10 +274,11 @@ def save_answers(db: DbSession, user_id: uuid.UUID, items: list[InterestAnswerIn
 
 
 def get_progress(db: DbSession, user_id: uuid.UUID) -> dict:
-    """The student's saved answers so far, plus whether all 20 questions
-    have been answered (Phase 6 `GET /me/interest-answers`)."""
-    total_questions = db.execute(select(func.count()).select_from(InterestQuestion)).scalar_one()
-    rows = list(db.execute(select(InterestAnswer).where(InterestAnswer.user_id == user_id)).scalars())
+    """Saved answers for the current set, and whether it's finished. Never
+    creates a set (`GET /me/interest-answers`)."""
+    current = _latest_set(db, user_id)
+    if current is None:
+        return {"answers": [], "complete": False}
+    rows = db.execute(select(InterestAnswer).where(InterestAnswer.set_id == current.id)).scalars()
     answers = [{"question_id": row.question_id, "option_id": row.chosen_option_id} for row in rows]
-    complete = total_questions > 0 and len(rows) >= total_questions
-    return {"answers": answers, "complete": complete}
+    return {"answers": answers, "complete": current.completed_at is not None}

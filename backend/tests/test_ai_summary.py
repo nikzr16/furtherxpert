@@ -54,9 +54,9 @@ def _complete_results(client, token):
 
 
 def _complete_interest_test(client, token):
-    """Answer all 20 questions with "None of the above" -- the test is
-    complete (decision 0008), regardless of which areas end up scored."""
-    questions = client.get("/interest-test").json()
+    """Answer all 40 questions in the set with "None of the above" -- the
+    test is complete (decision 0008), regardless of which areas end up scored."""
+    questions = client.get("/me/interest-test", headers=_auth(token)).json()["questions"]
     payload = []
     for q in questions:
         none_option = next(opt for opt in q["options"] if opt["text"] == "None of the above")
@@ -254,7 +254,7 @@ def test_cached_summary_reused_until_data_changes(client, make_register_payload,
     assert len(fake_openai.calls) == 2
 
     # Changing interest-test answers also invalidates it -- another regenerate.
-    questions = client.get("/interest-test").json()
+    questions = client.get("/me/interest-test", headers=_auth(token)).json()["questions"]
     q1 = questions[0]
     tagged_option = next(opt for opt in q1["options"] if opt["text"] != "None of the above")
     resp = client.put(
@@ -310,7 +310,7 @@ def test_not_enough_data_when_nothing_saved_yet(client, make_register_payload, f
 def test_not_enough_data_when_interest_test_incomplete(client, make_register_payload, fake_openai):
     _, token, _ = _register_and_login(client, make_register_payload)
     _complete_results(client, token)
-    # Interest test left untouched -- 0 of 20 answered.
+    # Interest test left untouched -- 0 of 40 answered.
 
     resp = client.get("/me/analysis/summary", headers=_auth(token))
     assert resp.status_code == 200

@@ -78,10 +78,6 @@ export function getProgram(code) {
   return publicRequest(`/programs/${encodeURIComponent(code)}`)
 }
 
-export function getInterestTestQuestions() {
-  return publicRequest('/interest-test')
-}
-
 // --- Needs login (authedFetch from AuthContext) -------------------------
 
 export function getMe(authedFetch) {
@@ -98,6 +94,14 @@ export function getMyResults(authedFetch) {
 
 export function putMyResults(authedFetch, items) {
   return authedFetch('/me/results', { method: 'PUT', body: items })
+}
+
+export function getMyInterestTest(authedFetch) {
+  return authedFetch('/me/interest-test')
+}
+
+export function rotateMyInterestTest(authedFetch) {
+  return authedFetch('/me/interest-test/rotate', { method: 'POST' })
 }
 
 export function getMyInterestAnswers(authedFetch) {
