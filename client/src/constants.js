@@ -23,4 +23,17 @@ export const RACES = [
   'Lain-lain',
 ]
 
+// backend/app/importer/subjects.py SUBJECT_GROUPS -- all 7 groups, in the
+// same order GET /me/analysis uses (by code). The "excel" chart shows every
+// group; one the student took no subjects in shows "N/A" (decision 0019).
+export const SUBJECT_GROUPS = [
+  { code: 'ARTS', name: 'Arts' },
+  { code: 'COMMERCE', name: 'Commerce' },
+  { code: 'HUMANITIES', name: 'Humanities' },
+  { code: 'LANGUAGES', name: 'Languages' },
+  { code: 'MATHEMATICS', name: 'Mathematics' },
+  { code: 'SCIENCES', name: 'Sciences' },
+  { code: 'TECHNICAL_ICT', name: 'Technical & ICT' },
+]
+
 export const MIN_PASSWORD_LENGTH = 8

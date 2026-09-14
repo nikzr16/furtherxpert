@@ -22,6 +22,7 @@ function splitLabel(name) {
 // labels are centred on the spoke, so none of them overlap the web itself.
 function SpokeLabel({ x, y, cy, textAnchor, payload, scores, color }) {
   const lines = splitLabel(payload.value)
+  const score = scores[payload.value]
   const lineCount = lines.length + 1
   let firstDy
   if (y < cy - 4) firstDy = -(lineCount - 1) * LINE_HEIGHT - 4
@@ -35,8 +36,8 @@ function SpokeLabel({ x, y, cy, textAnchor, payload, scores, color }) {
           {line}
         </tspan>
       ))}
-      <tspan x={x} dy={LINE_HEIGHT + 1} fill={color} fontSize={12} fontWeight={600}>
-        {scores[payload.value]}%
+      <tspan x={x} dy={LINE_HEIGHT + 1} fill={score == null ? '#94a3b8' : color} fontSize={12} fontWeight={600}>
+        {score == null ? 'N/A' : `${score}%`}
       </tspan>
     </text>
   )
@@ -59,6 +60,10 @@ export default function RadarChartCard({
   const hasData = data && data.length > 0
   const style = VARIANTS[variant]
   const scores = hasData ? Object.fromEntries(data.map((row) => [row.name, row.score])) : {}
+  // A row with `score: null` has no value (for example a subject group the
+  // student took no subjects in). It's drawn at the centre with no dot, and
+  // labelled "N/A" instead of a percentage (decision 0019).
+  const chartData = hasData ? data.map((row) => ({ ...row, value: row.score ?? 0 })) : []
   const gradientId = `radar-fill-${variant}`
 
   return (
@@ -90,7 +95,7 @@ export default function RadarChartCard({
         <>
           <div className="mt-2 h-80 w-full sm:h-[22rem]" aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={data} outerRadius="66%" margin={{ top: 24, right: 36, bottom: 24, left: 36 }}>
+              <RadarChart data={chartData} outerRadius="66%" margin={{ top: 24, right: 36, bottom: 24, left: 36 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={style.color} stopOpacity={0.35} />
@@ -107,16 +112,22 @@ export default function RadarChartCard({
                 <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} tickCount={5} />
                 <Radar
                   name={scoreLabel}
-                  dataKey="score"
+                  dataKey="value"
                   stroke={style.color}
                   strokeWidth={2}
                   fill={`url(#${gradientId})`}
                   fillOpacity={1}
-                  dot={{ r: 3, fill: style.color, strokeWidth: 0 }}
+                  dot={(props) =>
+                    chartData[props.index]?.score == null ? (
+                      <g key={`dot-${props.index}`} />
+                    ) : (
+                      <circle key={`dot-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill={style.color} />
+                    )
+                  }
                   activeDot={{ r: 5 }}
                 />
                 <Tooltip
-                  formatter={(value) => [`${value}%`, scoreLabel]}
+                  formatter={(value, _name, item) => [item.payload.score == null ? 'N/A' : `${value}%`, scoreLabel]}
                   contentStyle={{
                     borderRadius: 12,
                     border: '1px solid #e2e8f0',
@@ -142,7 +153,7 @@ export default function RadarChartCard({
               {data.map((row) => (
                 <tr key={row.name}>
                   <td>{row.name}</td>
-                  <td>{row.score}%</td>
+                  <td>{row.score == null ? 'N/A, no subjects taken' : `${row.score}%`}</td>
                 </tr>
               ))}
             </tbody>

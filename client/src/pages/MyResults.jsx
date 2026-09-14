@@ -7,6 +7,7 @@ import { ReasonList, VerdictPill } from '../components/EligibilityBadge'
 import AISummaryCard from '../components/AISummaryCard'
 import { Alert, Badge, Icon, PageHeader, Spinner } from '../components/ui'
 import { displayProgram } from '../programName'
+import { SUBJECT_GROUPS } from '../constants'
 
 export default function MyResults() {
   const { authedFetch } = useAuth()
@@ -31,7 +32,19 @@ export default function MyResults() {
     }
   }, [authedFetch])
 
-  const subjectGroupData = analysis ? analysis.subject_groups.map((g) => ({ name: g.name, score: g.score })) : []
+  // The backend only returns groups the student took subjects in (PRD T1).
+  // The chart shows all 7, with `score: null` ("N/A") for the rest -- display
+  // only, no score is worked out here (decision 0019). With no results at all
+  // the list stays empty, so the chart keeps its "add your results" state.
+  const subjectGroupData = []
+  if (analysis && analysis.subject_groups.length > 0) {
+    const scoreByGroup = Object.fromEntries(analysis.subject_groups.map((g) => [g.group, g.score]))
+    const knownGroups = new Set(SUBJECT_GROUPS.map((g) => g.code))
+    for (const g of SUBJECT_GROUPS) subjectGroupData.push({ name: g.name, score: scoreByGroup[g.code] ?? null })
+    for (const g of analysis.subject_groups) {
+      if (!knownGroups.has(g.group)) subjectGroupData.push({ name: g.name, score: g.score })
+    }
+  }
   const interestAreaData =
     analysis && analysis.interest_test_complete
       ? analysis.interest_areas.map((a) => ({ name: a.area, score: a.score }))

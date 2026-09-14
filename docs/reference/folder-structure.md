@@ -127,7 +127,7 @@ furtherxpert/
 │       ├── main.jsx                starts React
 │       ├── App.jsx                 app shell + routes (Phase 6)
 │       ├── api.js                  calls the backend (uses VITE_API_URL) (Phase 6)
-│       ├── constants.js            shared constants: SPM grade list, required subjects (Phase 6)
+│       ├── constants.js            shared constants: SPM grade list, required subjects (Phase 6), all 7 subject groups (decision 0019)
 │       ├── programName.js          cleans e-Panduan markers ("#", "Baru") out of program names and title-cases them for display (decisions 0009, 0016)
 │       ├── index.css               Tailwind import, theme font, shared style classes (.btn, .card, .input...) (Phase 8)
 │       ├── context/
@@ -258,7 +258,7 @@ furtherxpert/
 | `client/src/App.jsx` | Page frame (`Nav`, page, `Footer`), `ScrollToTop`, and routes for all pages plus a `*` route to `NotFound.jsx`, wrapped in `AuthContext` (Phase 6; frame and 404 route added Phase 8) |
 | `client/src/index.css` | Tailwind import, the Poppins theme font, and shared style classes used by every page: `.container-page`, `.card`, `.btn` (+ `-primary`, `-secondary`, `-ghost`, `-danger`, `-danger-outline`, `-lg`, `-sm`), `.label`, `.input`, `.select`, `.hint`, `.field-error`, `.link`, `.bg-grid` (Phase 8) |
 | `client/src/api.js` | Helper for backend calls, including the `GET`/`PUT /me/interest-answers` resume calls (Phase 6) and `getMyAnalysisSummary` for `GET /me/analysis/summary` (Phase 7) |
-| `client/src/constants.js` | Shared constants: the real SPM grade list, the required-subject codes (BM, SJ) (Phase 6) |
+| `client/src/constants.js` | Shared constants: the real SPM grade list, the required-subject codes (BM, SJ) (Phase 6), and `SUBJECT_GROUPS`, the 7 subject groups copied from `backend/app/importer/subjects.py` so the "excel" chart can show every group, with N/A for empty ones (decision `0019`). Keep it in sync with the backend list |
 | `client/src/programName.js` | `displayProgram()`: hides the `#` marker (it repeats the interview flag), turns "Baru" into a "New" badge, and shows the name in title case with Malay joining words lowercase; raw names stay in the data and search (decisions 0009, 0016) |
 | `client/src/context/AuthContext.jsx` | Holds the access token in React state only (never `localStorage`/`sessionStorage`); does a silent `POST /auth/refresh` on app load with `credentials: "include"`; retries a failed call once via refresh, then routes to Login (Phase 6) |
 | `client/src/components/ui.jsx` | Shared pieces every page reuses: `Icon` (inline SVG icons), `LogoMark`, `Logo`, `PageHeader`, `Alert` (success/warning/error/info), `Badge`, `ProgramFlags` (New/STEM/TVET/Bumiputera only/Interview badges), `Spinner`, `PageLoader`, `PageError` (Phase 8) |
