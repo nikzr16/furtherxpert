@@ -1,9 +1,9 @@
 # Product Roadmap
 
 > **Quick summary**
-> - **What:** the build order for FurtherXpert, in 7 phases.
-> - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI.
-> - **Now:** all 7 phases are shipped -- foundation, accounts, reference data, student input, rules engine, client pages, and Phase 7 (AI summary). The first release is fully built.
+> - **What:** the build order for FurtherXpert, in 8 phases.
+> - **Why this order:** each phase stands on the one before. First the base, then login, then data, then rules, then screens, then AI, then polish.
+> - **Now:** Phases 1–7 are shipped, so the first release is fully built. **Phase 8 (UI redesign) is in progress:** the code is committed, but the logged-in pages still need a browser check.
 > - **Where the details live:** `docs/prd/furtherxpert-prd.md`.
 
 > **Type:** Roadmap | **Must stay current:** Yes -- update when phases, features, or priorities change
@@ -100,6 +100,15 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 |---|---|---|---|
 | `docs/prd/furtherxpert-prd.md` (T4) | `backend/app/services/`, `client/src/` | shipped | Confirmed live 2026-09-14: a throwaway account got a real `GET /me/analysis/summary` reply from GPT-5 in ~6.0 seconds (acceptance criterion 7), well under the 10-second budget; the account was then deleted. 126 backend tests pass (up from 116), including a payload-privacy test (the outgoing OpenAI request carries no email/race/citizenship/grades/user id), a forced-AI-failure test showing charts still return via `/me/analysis` while the summary route returns a friendly `unavailable` state (acceptance criterion 5), a timeout-path test, cache-hit/cache-invalidation tests, and a cross-user isolation test. `ai_summary.py` sends only interest-area and subject-group names + scores to GPT-5, with a 6-second hard timeout and no retries. The live check found the prompt-only "120 words or fewer" instruction wasn't reliable on its own (one reply came back at 122 words), so deterministic code-level truncation (`_enforce_word_limit`) was added as the real guarantee -- see decision `0013`. `npm run build` passes |
 
+### Phase 8: UI redesign
+
+**Trigger:** Phase 7 shipped, and the product owner asked for a production-quality look (2026-09-14).
+**Graduation criteria:** acceptance checks 1–10 in `docs/prd/ui-redesign-prd.md` pass, and every item in the Definition of Done in `docs/plan/ui-redesign-plan.md` is ticked. That includes the by-hand browser check of the logged-in pages.
+
+| PRD | Module | Status | Notes |
+|---|---|---|---|
+| `docs/prd/ui-redesign-prd.md` | `client/src/` | in-progress | Code committed 2026-09-14 (`9fe75b1`), client files only. Built before its PRD and plan, which were written afterwards (decision `0015`). New shared look (`components/ui.jsx`, `index.css`), sticky menu with a phone menu, footer, 404 page, every page rebuilt, program names in title case (decision `0016`), and spider charts that show scores at each spoke instead of scale numbers (decision `0017`). **Checked:** `npm run build` passes; lint shows no new warnings; Home, Log in, Register, Explore and Program Detail were checked in a browser at about 700px and 1200px wide. **Still open:** a browser check of SPM Results, Interest Test, My Results (including the chart labels with real data) and Account; a 375px phone check; the 404 page; a keyboard walk-through; reviewer sign-off |
+
 ## Cross-Cutting Concerns
 
 | Concern | Introduced In | Matured In | Current State |
@@ -116,6 +125,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 | PRD | Phase | Module | Status |
 |---|---|---|---|
 | `docs/prd/furtherxpert-prd.md` (plan: `docs/plan/furtherxpert-plan.md`) | 1–7 | `backend/`, `client/` | shipped |
+| `docs/prd/ui-redesign-prd.md` (plan: `docs/plan/ui-redesign-plan.md`) | 8 | `client/` | in-progress |
 
 ## Prioritization Log
 
@@ -123,6 +133,7 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 |---|---|---|
 | 2026-09-12 | Set the 7-phase order | Each phase relies on the one before it |
 | 2026-09-12 | Added the implementation plan before Phase 3 | Phases 1–2 were built from the PRD alone; from Phase 3 on, builds follow the plan |
+| 2026-09-14 | Added Phase 8, UI redesign | The product owner wanted a production-quality look before wider rollout. Its PRD and plan were written after the build (decision `0015`) |
 
 ## Later (not in the first release)
 
@@ -131,14 +142,18 @@ FurtherXpert helps every Malaysian SPM holder see what they're best at and what 
 - Asasi, Matrikulasi and polytechnic routes
 - Malay-language screens
 - Student merit calculator
+- Dark mode
+- Privacy Policy and Terms pages
 
 ## Related Documents
 
 | Document | Type | Relationship |
 |---|---|---|
 | `docs/documentation-standard.md` | Standard | Governs how all docs are maintained |
-| `docs/prd/furtherxpert-prd.md` | Intent (PRD) | What each phase builds, and why |
-| `docs/plan/furtherxpert-plan.md` | Plan | How each phase is built: tasks and checks |
+| `docs/prd/furtherxpert-prd.md` | Intent (PRD) | What Phases 1–7 build, and why |
+| `docs/plan/furtherxpert-plan.md` | Plan | How Phases 1–7 are built: tasks and checks |
+| `docs/prd/ui-redesign-prd.md` | Intent (PRD) | What Phase 8 (UI redesign) builds, and why |
+| `docs/plan/ui-redesign-plan.md` | Plan | How Phase 8 is built, with its Definition of Done |
 | `docs/furtherxpert-workflow.md` | Workflow | How the app behaves today |
 | `docs/reference/folder-structure.md` | Reference | Structural placement of modules |
 | `docs/decisions/NNNN-*.md` | Decision log | Deviations that may affect roadmap |

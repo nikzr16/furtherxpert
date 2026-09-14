@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** a map of where every part of FurtherXpert lives.
 > - **Why:** so anyone can find the right file fast, and put new files in the right place.
-> - **Now:** all 7 phases are built -- foundation, accounts, reference data, student input, rules engine, client pages (all 8 screens), and Phase 7 (AI summary). This is the final phase of the first release; there are no *(planned)* items left.
+> - **Now:** all 7 phases are built -- foundation, accounts, reference data, student input, rules engine, client pages (all 8 screens), and Phase 7 (AI summary). This is the final phase of the first release; there are no *(planned)* items left. Phase 8 (UI redesign) added shared client pieces and a 404 page (client files only).
 
 > **Type:** Reference | **Must stay current:** Yes -- update when structure, routes, schemas, or config change
 
@@ -32,7 +32,9 @@ furtherxpert/
 ├── .claude/                        harness: agents, skills, workflows (proj-* = project)
 ├── docs/
 │   ├── prd/furtherxpert-prd.md   the PRD: what and why (source of truth)
+│   ├── prd/ui-redesign-prd.md    Phase 8 PRD: the UI redesign
 │   ├── plan/furtherxpert-plan.md the plan: how each phase is built
+│   ├── plan/ui-redesign-plan.md  Phase 8 plan + Definition of Done
 │   ├── furtherxpert-workflow.md     how the app behaves today
 │   ├── product-roadmap.md          build order + status
 │   ├── project-knowledge.md        background knowledge (starter)
@@ -126,18 +128,22 @@ furtherxpert/
 │       ├── App.jsx                 app shell + routes (Phase 6)
 │       ├── api.js                  calls the backend (uses VITE_API_URL) (Phase 6)
 │       ├── constants.js            shared constants: SPM grade list, required subjects (Phase 6)
-│       ├── programName.js          cleans e-Panduan markers ("#", "Baru") out of program names for display (decision 0009)
-│       ├── index.css               Tailwind import
+│       ├── programName.js          cleans e-Panduan markers ("#", "Baru") out of program names and title-cases them for display (decisions 0009, 0016)
+│       ├── index.css               Tailwind import, theme font, shared style classes (.btn, .card, .input...) (Phase 8)
 │       ├── context/
 │       │   └── AuthContext.jsx     holds the access token in memory, silent refresh on load, retry-once-on-401 (Phase 6)
 │       ├── components/
-│       │   ├── Nav.jsx             shared top navigation
+│       │   ├── ui.jsx              shared pieces: icons, logo, page header, alerts, badges, loaders, error state (Phase 8)
+│       │   ├── Nav.jsx             sticky top menu, folds into a menu button on phones (Phase 8)
+│       │   ├── Footer.jsx          site footer with links and the e-Panduan data credit (Phase 8)
+│       │   ├── AuthShell.jsx       two-panel layout for Log in and Register (Phase 8)
 │       │   ├── ProtectedRoute.jsx  sends a logged-out visitor to Login instead of the page
-│       │   ├── RadarChartCard.jsx  reusable radar chart + a real <table> text fallback (WCAG AA) + empty states
-│       │   ├── EligibilityBadge.jsx eligibility verdict badge with reasons
+│       │   ├── RadarChartCard.jsx  reusable radar chart with name + score spoke labels (decision 0017) + a real <table> text fallback (WCAG AA) + empty states
+│       │   ├── EligibilityBadge.jsx eligibility verdict pill (VerdictPill) and reasons (ReasonList)
 │       │   └── AISummaryCard.jsx   AI summary card; fetches GET /me/analysis/summary independently of the charts (Phase 7)
 │       └── pages/
-│           ├── Home.jsx            home page, shows /health
+│           ├── Home.jsx            landing page: headline, example chart, live program counts, how it works (Phase 8)
+│           ├── NotFound.jsx        "Page not found" page for unknown addresses (Phase 8)
 │           ├── Register.jsx        sign-up form, explains the race question, collects consent (Phase 6)
 │           ├── Login.jsx           log-in form, generic wrong-credentials message (Phase 6)
 │           ├── SpmResults.jsx      SPM subject + grade rows, BM/Sejarah required (Phase 6)
@@ -249,17 +255,22 @@ furtherxpert/
 
 | File | Purpose |
 |---|---|
-| `client/src/App.jsx` | Header "FurtherXpert" + page routes for all 8 pages, wrapped in `AuthContext` (Phase 6) |
+| `client/src/App.jsx` | Page frame (`Nav`, page, `Footer`), `ScrollToTop`, and routes for all pages plus a `*` route to `NotFound.jsx`, wrapped in `AuthContext` (Phase 6; frame and 404 route added Phase 8) |
+| `client/src/index.css` | Tailwind import, the Poppins theme font, and shared style classes used by every page: `.container-page`, `.card`, `.btn` (+ `-primary`, `-secondary`, `-ghost`, `-danger`, `-danger-outline`, `-lg`, `-sm`), `.label`, `.input`, `.select`, `.hint`, `.field-error`, `.link`, `.bg-grid` (Phase 8) |
 | `client/src/api.js` | Helper for backend calls, including the `GET`/`PUT /me/interest-answers` resume calls (Phase 6) and `getMyAnalysisSummary` for `GET /me/analysis/summary` (Phase 7) |
 | `client/src/constants.js` | Shared constants: the real SPM grade list, the required-subject codes (BM, SJ) (Phase 6) |
-| `client/src/programName.js` | `displayProgram()`: hides the `#` marker (it repeats the interview flag) and turns "Baru" into a "New" badge; raw names stay in the data and search (decision 0009) |
+| `client/src/programName.js` | `displayProgram()`: hides the `#` marker (it repeats the interview flag), turns "Baru" into a "New" badge, and shows the name in title case with Malay joining words lowercase; raw names stay in the data and search (decisions 0009, 0016) |
 | `client/src/context/AuthContext.jsx` | Holds the access token in React state only (never `localStorage`/`sessionStorage`); does a silent `POST /auth/refresh` on app load with `credentials: "include"`; retries a failed call once via refresh, then routes to Login (Phase 6) |
-| `client/src/components/Nav.jsx` | Shared top navigation shown on every page (Phase 6) |
-| `client/src/components/ProtectedRoute.jsx` | Wraps a page; sends a logged-out visitor to Login instead of rendering it (Phase 6) |
-| `client/src/components/RadarChartCard.jsx` | Reusable radar chart (Recharts). Always renders a real `<table>` of the same numbers inside a `<details>` (not `display: none`), for WCAG AA (Web Content Accessibility Guidelines, level AA) accessibility, plus empty states (Phase 6) |
-| `client/src/components/EligibilityBadge.jsx` | Shows a program's Eligible/Conditional/Not Eligible verdict with its plain-English reasons (Phase 6) |
+| `client/src/components/ui.jsx` | Shared pieces every page reuses: `Icon` (inline SVG icons), `LogoMark`, `Logo`, `PageHeader`, `Alert` (success/warning/error/info), `Badge`, `ProgramFlags` (New/STEM/TVET/Bumiputera only/Interview badges), `Spinner`, `PageLoader`, `PageError` (Phase 8) |
+| `client/src/components/Nav.jsx` | Sticky top menu on every page. Links change with login. Folds into a menu button below 768px wide (Phase 6; rebuilt Phase 8) |
+| `client/src/components/Footer.jsx` | Site footer: logo, short description, links, e-Panduan data credit (Phase 8) |
+| `client/src/components/AuthShell.jsx` | Two-panel layout shared by Log in and Register: brand panel on wide screens, form card on the right (Phase 8) |
+| `client/src/components/ProtectedRoute.jsx` | Wraps a page; sends a logged-out visitor to Login instead of rendering it. Shows `PageLoader` while login is checked (Phase 6) |
+| `client/src/components/RadarChartCard.jsx` | Reusable radar chart (Recharts). Each spoke shows the area name with its score underneath; scale numbers hidden (decision `0017`). Always renders a real `<table>` of the same numbers inside a `<details>` that starts closed (not `display: none`), for WCAG AA (Web Content Accessibility Guidelines, level AA) accessibility, plus empty states with a link to the missing step (Phase 6; `variant` excel/love colours and spoke labels added Phase 8) |
+| `client/src/components/EligibilityBadge.jsx` | Shows a program's Eligible/Conditional/Not Eligible verdict with its plain-English reasons. Also exports `VerdictPill` and `ReasonList` separately, used by My Results (Phase 6; split Phase 8) |
 | `client/src/components/AISummaryCard.jsx` | Fetches `GET /me/analysis/summary` on its own `useEffect`, independent of `MyResults.jsx`'s chart fetch, so a slow or failed AI call never blocks or delays the charts. Renders loading / `ok` / `not_enough_data` / `unavailable` states (Phase 7) |
-| `client/src/pages/Home.jsx` | Home page that shows the server status |
+| `client/src/pages/Home.jsx` | Landing page: headline, an example chart labelled "Example result", live program and university counts (from `GET /programs` and `GET /universities`), how it works, features, closing sign-up banner (Phase 8) |
+| `client/src/pages/NotFound.jsx` | "Page not found" page for any unknown address, with links to Home and Explore (Phase 8) |
 | `client/src/pages/Register.jsx` | Sign-up form; explains that race is collected only to check Bumiputera-only programs; collects consent (Phase 6) |
 | `client/src/pages/Login.jsx` | Log-in form; shows the backend's generic wrong-credentials message; redirects to the page the student was headed to (Phase 6) |
 | `client/src/pages/SpmResults.jsx` | SPM subject + grade rows; Bahasa Melayu and Sejarah always shown as required; grade choices limited to the real SPM grade list, backend stays authoritative (Phase 6) |
@@ -290,5 +301,6 @@ furtherxpert/
 | Document | Type | Relationship |
 |---|---|---|
 | `docs/prd/furtherxpert-prd.md` | Intent | Product goals behind these structures (T1, T2, T4, T5, T6, T7, T8) |
+| `docs/prd/ui-redesign-prd.md` | Intent | Phase 8: why the client's shared pieces and new layouts exist |
 | `docs/product-roadmap.md` | Roadmap | Which phase adds each *(planned)* item |
 | `docs/decisions/NNNN-*.md` | Decision log | Structural changes that diverged from the plan |

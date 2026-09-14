@@ -3,7 +3,7 @@
 > **Quick summary**
 > - **What:** how the app behaves **today**: what happens, step by step, when a student uses it.
 > - **Why:** when you change code, this doc is the spec for current behaviour. If code and this doc disagree, fix one of them.
-> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back, and resuming a part-finished interest test), analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes, and gated on the interest test being fully answered), the client pages (Phase 6: the 8 screens a student actually sees and clicks through, from registering to deleting their account), and the AI summary (Phase 7: a short plain-English summary of a student's own charts, built from scores only, cached alongside the charts, and loaded separately so it never blocks or delays them). Phase 7 is the final phase of the first release, so the flows below now cover the full build.
+> - **Now covers:** accounts (sign up, log in, refresh, log out, view and delete account), reference data (the yearly import, plus the subject/university/program lookup routes), student input (saving SPM results, taking or retaking the interest test, reading your own data back, and resuming a part-finished interest test), analysis (Phase 5: the 2 charts, Best Fit, and eligibility, cached and recomputed only when the student's data changes, and gated on the interest test being fully answered), the client pages (Phase 6: the 8 screens a student actually sees and clicks through, from registering to deleting their account), and the AI summary (Phase 7: a short plain-English summary of a student's own charts, built from scores only, cached alongside the charts, and loaded separately so it never blocks or delays them). Phase 7 is the final phase of the first release, so the flows below cover the full build. Phase 8 (UI redesign) then gave every page a new look, without changing what the pages do or which API calls they make (Flow 5).
 
 > **Type:** Workflow | **Must stay current:** Yes -- update when behavior changes
 
@@ -214,12 +214,22 @@ Analysis turns a student's saved SPM (**Sijil Pelajaran Malaysia**) results and 
 
 ## Flow 5: Client pages
 
-The client is the website a student actually uses (`client/src/`, React + Vite + Tailwind CSS + Recharts, a charting library). It has 8 pages. Every page that needs a login is wrapped in `ProtectedRoute.jsx`, which sends a logged-out visitor to Login instead of showing the page. None of these pages invent new rules -- each one just calls the API routes from Flows 1-4 and shows the result.
+The client is the website a student actually uses (`client/src/`, React + Vite + Tailwind CSS + Recharts, a charting library). It has 8 main pages, plus a Home page and a "Page not found" page. Every page that needs a login is wrapped in `ProtectedRoute.jsx`, which sends a logged-out visitor to Login instead of showing the page. None of these pages invent new rules -- each one just calls the API routes from Flows 1-4 and shows the result.
+
+**Shared frame (Phase 8):** every page sits between a top menu (`components/Nav.jsx`) and a footer (`components/Footer.jsx`).
+- The top menu stays pinned while scrolling. Below 768px wide it folds into a menu button.
+- Its links change with login: logged out shows Explore, Log in and Get started; logged in shows My results, SPM results, Interest test, Explore and Account.
+- Opening a new page jumps back to the top.
+- An address that doesn't exist shows `pages/NotFound.jsx`, with links back to Home and Explore.
+- While a page loads it shows a spinner; if loading fails it shows a red error box. Both come from `components/ui.jsx`.
+- Program names show in title case everywhere, for example "Diploma Analisis Pelaburan" (decision `0016`).
+
+**Home page:** `pages/Home.jsx`. Shows a headline, an example spider chart labelled "Example result" (made-up numbers, never a real student's), how it works, and features. It calls `GET /programs` and `GET /universities` (Flow 2 step 2) only to show live counts; if either fails, the counts are simply left out. Its buttons change with login.
 
 ### 1. Register
 
 **Page:** `pages/Register.jsx`.
-**What it does:** shows a form for email, password, citizenship, race, SPM year, and a consent tick. It explains in plain words that **race** is only collected to check Bumiputera-only programs (a UPU rule, not the app's choice), before asking for it.
+**What it does:** shows a form for email, password, citizenship (a Yes/No toggle), race, SPM year, and a consent tick. It explains in plain words that **race** is only collected to check Bumiputera-only programs (a UPU rule, not the app's choice). On wide screens, Register and Log in share a two-panel layout (`components/AuthShell.jsx`).
 **Calls:** `POST /auth/register` (Flow 1 step 1).
 **On failure:** shows the field error the backend returns (bad password length, unknown race, missing consent) or "Email already registered" and a link to Login.
 
@@ -242,16 +252,17 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 
 **Page:** `pages/SpmResults.jsx`.
 **What it does:** shows one row per subject (subject + grade dropdown), with Bahasa Melayu and Sejarah always present since they're required (Flow 3 step 1). Grade choices are limited to the 10 real SPM grades from `constants.js`, but the backend is still the final judge -- the page never assumes its own copy of the rules is complete.
+**Save bar:** the Save button stays disabled until Bahasa Melayu and Sejarah are added and every subject has a grade. A hint next to it says what's still missing, for example "Pick a grade for 2 more subjects."
 **Calls:** `GET /me/results` on load, `PUT /me/results` on save (Flow 3 steps 1-2).
 **On failure:** shows the backend's field error (bad grade, duplicate subject, missing BM/SJ, unknown subject code) without saving.
 
 ### 5. Interest Test page
 
 **Page:** `pages/InterestTest.jsx`.
-**What it does:** shows the 20 questions one at a time (or as a list, page by page), each with its options.
+**What it does:** shows all 20 questions as a list of cards. Each option is a tile the student clicks; a picked tile is highlighted.
 1. On load, calls `GET /me/interest-answers` (Flow 3 step 3, decision `0008`) to fetch any answers already saved, and pre-fills them so the student resumes exactly where they left off -- including after closing the tab and coming back later.
 2. Saves each answer immediately after the student picks it, with `PUT /me/interest-answers` sending just that one `{question_id, option_id}` pair. Because that route merges/upserts (decision `0008`) instead of replacing everything, earlier answers are never lost by a later, smaller save.
-3. Shows a live "N of 20 answered" progress count from the same saved-answers data.
+3. Shows a live "N of 20 answered" count and a progress bar, pinned just under the top menu while scrolling. Once all 20 are answered, a "You've answered every question" card links to My Results.
 **Resume/completeness rule:** the test only counts as finished once all 20 questions have an answer across every save so far -- there's no separate "submit" step. Until then, `GET /me/analysis` (Flow 4 step 1g2) forces the interest-area chart and Likely to love to empty/0, so the My Results page (step 6 below) shows an unfinished state rather than a misleading partial score.
 
 ### 6. My Results page
@@ -259,19 +270,24 @@ The client is the website a student actually uses (`client/src/`, React + Vite +
 **Page:** `pages/MyResults.jsx`.
 **What it does:** the main results screen. Shows the AI summary via `components/AISummaryCard.jsx` (Phase 7, Flow 6), both radar charts (subject-group scores and interest-area scores) via the shared `components/RadarChartCard.jsx`, the Best Fit program list with sweet-spot / likely-to-excel / likely-to-love badges, and an eligibility badge with reasons for each program, via `components/EligibilityBadge.jsx`.
 **Calls:** `GET /me/analysis` (Flow 4 step 1) for the charts and Best Fit, plus its own independent `GET /me/analysis/summary` call (Flow 6) for the AI summary -- the two calls run in parallel, not one after the other, so a slow or failed summary never delays the charts.
+**Setup checklist:** if the student has no SPM results yet, or hasn't finished the interest test, a "Finish setting up" card shows both steps, ticked or linked.
+**Chart labels:** each spoke of a chart shows the area name, with its score underneath. The chart's 0–100 scale numbers are hidden. Long names split onto 2 lines (decision `0017`).
 **Accessibility fallback:** every radar chart also renders a real `<table>` of the same numbers inside a collapsed `<details>` element (not hidden with `display: none`), so a screen reader or a student who can't read the chart visually still gets the same information. This meets **WCAG AA** (Web Content Accessibility Guidelines, level AA -- a common accessibility standard).
 **Incomplete interest test:** while `interest_test_complete` is `false` (decision `0008`), the interest-area chart and Likely to love area show an empty state telling the student to finish the interest test, instead of a chart that looks real but isn't.
 
 ### 7. Explore page
 
 **Page:** `pages/Explore.jsx`.
-**What it does:** lets a student browse every diploma program, not just their own Best Fit, with filters by interest area and university plus free-text search.
+**What it does:** lets a student browse every diploma program, not just their own Best Fit, with filters by interest area and university plus free-text search. Programs show as cards. When any filter is set, a "Clear filters" button appears. If nothing matches, the page says so and offers to clear the filters.
 **Calls:** `GET /programs` once on load (Flow 2 step 2), with no filter parameters, then filters that one fetched list in the browser (**client-side filtering**) as the student changes the area/university/search fields, instead of re-calling the API on every keystroke. With the current session's program count (166 category-A programs), fetching once and filtering locally keeps the page responsive without extra round trips to the server.
 
 ### 8. Program Detail page
 
 **Page:** `pages/ProgramDetail.jsx`.
-**What it does:** shows one program's full detail: everything from the Explore list, plus career paths, the entry-rule tree, the original Malay rule text (`text_ms`), and a source-credit line crediting e-Panduan.
+**What it does:** shows one program's full detail: everything from the Explore list, plus campuses, career paths, the original Malay rule text (`text_ms`), and a source-credit line crediting e-Panduan.
+- Entry rules show one UPU category at a time, with Category A / Category B tabs. Each tab shows the general rules (syarat am) and the program rules (syarat khas).
+- A rule with no text shows "No extra requirements listed for this category" instead of an empty box.
+- A side panel asks "Do you qualify?" and links to My Results when logged in, or to Register when logged out.
 **Calls:** `GET /programs/{code}` (Flow 2 step 2).
 **On failure:** shows a "program not found" message on a `404`.
 
@@ -381,5 +397,6 @@ That means the summary automatically inherits Flow 4's existing cache rule (deci
 |---|---|---|
 | `docs/prd/furtherxpert-prd.md` | Intent | Product goals these flows fulfil (T1, T2, T3, T4, T5, T6, T7) |
 | `docs/plan/furtherxpert-plan.md` | Plan | How the flows were planned |
+| `docs/prd/ui-redesign-prd.md`, `docs/plan/ui-redesign-plan.md` | Intent, Plan | Phase 8: the new look of the Flow 5 pages |
 | `docs/reference/folder-structure.md` | Reference | Where each file of these flows lives |
 | `docs/decisions/NNNN-*.md` | Decision log | Deviations from the plan |
